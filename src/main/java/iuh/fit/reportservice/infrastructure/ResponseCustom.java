@@ -31,15 +31,21 @@ public class ResponseCustom implements ResponseBodyAdvice<Object> {
             return body;
         }
 
+        if (body instanceof String) {
+            return body;
+        }
+
+        if (body instanceof byte[]) {
+            return body;
+        }
+
         HttpServletResponse httpResponse = ((ServletServerHttpResponse) response).getServletResponse();
         int statusCode = httpResponse.getStatus();
 
         BaseResponse<Object> baseResponse = new BaseResponse<>();
         baseResponse.setStatusCode(statusCode);
 
-        if (body instanceof String) {
-            return body;
-        }
+
 
         String path = request.getURI().getPath();
         if (path.startsWith("/v3/api-docs") || path.startsWith("/swagger-ui") || path.startsWith("/actuator")) {
