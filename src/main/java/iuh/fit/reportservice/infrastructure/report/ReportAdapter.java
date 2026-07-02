@@ -1,5 +1,6 @@
 package iuh.fit.reportservice.infrastructure.report;
 
+import iuh.fit.reportservice.application.dto.report.UserDetailReportResponse;
 import iuh.fit.reportservice.application.dto.report.UserReportResponse;
 import iuh.fit.reportservice.application.exception.ServiceException;
 import iuh.fit.reportservice.application.port.report.ReportPort;
@@ -21,10 +22,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.text.SimpleDateFormat;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 @Service
 @RequiredArgsConstructor
@@ -47,6 +45,36 @@ public class ReportAdapter implements ReportPort {
 
         JasperPrint jasperPrint = JasperFillManager.fillReport(
                 jasperReport, parameters, new JREmptyDataSource()
+        );
+
+        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+
+        if (format.equalsIgnoreCase(FormatType.PDF.getValue())) {
+            JasperExportManager.exportReportToPdfStream(jasperPrint, outputStream);
+        } else if (format.equalsIgnoreCase(FormatType.XLSX.getValue())) {
+            final JRXlsxExporter exporter = getJrXlsxExporter(jasperPrint, outputStream);
+            exporter.exportReport();
+        } else {
+            throw new ServiceException("Định dạng không hỗ trợ: " + format);
+        }
+
+        return outputStream.toByteArray();
+    }
+
+    @Override
+    public byte[] exportUserDetail(String format, String userId) throws ServiceException, JRException, IOException {
+        UserDetailReportResponse user = authClient.getUserById(userId).getData();
+        List<UserDetailReportResponse> dataList = Collections.singletonList(user);
+        JRBeanCollectionDataSource dataSource = new JRBeanCollectionDataSource(dataList);
+
+        Map<String, Object> parameters = new HashMap<>();
+        parameters.put("REPORT_DATE", getDateFormat());
+
+        InputStream reportStream = new ClassPathResource("templates/user/user-detail.jrxml").getInputStream();
+        JasperReport jasperReport = JasperCompileManager.compileReport(reportStream);
+
+        JasperPrint jasperPrint = JasperFillManager.fillReport(
+                jasperReport, parameters, dataSource
         );
 
         ByteArrayOutputStream outputStream = new ByteArrayOutputStream();

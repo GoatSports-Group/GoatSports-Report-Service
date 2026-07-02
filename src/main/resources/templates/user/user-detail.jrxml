@@ -1,0 +1,217 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jasperReport xmlns="http://jasperreports.sourceforge.net/jasperreports" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://jasperreports.sourceforge.net/jasperreports http://jasperreports.sourceforge.net/xsd/jasperreport.xsd" name="user_detail" pageWidth="650" pageHeight="842" columnWidth="610" leftMargin="20" rightMargin="20" topMargin="20" bottomMargin="20" uuid="506dd7fc-b831-423d-b781-4d10dbd8761e">
+    <property name="com.jaspersoft.studio.data.defaultdataadapter" value="One Empty Record"/>
+
+    <parameter name="REPORT_DATE" class="java.lang.String"/>
+
+    <field name="userId" class="java.util.UUID"/>
+    <field name="email" class="java.lang.String"/>
+    <field name="username" class="java.lang.String"/>
+    <field name="fullName" class="java.lang.String"/>
+    <field name="avatarUrl" class="java.lang.String"/>
+    <field name="status" class="java.lang.String"/>
+    <field name="createdAt" class="java.time.LocalDateTime"/>
+    <field name="roleName" class="java.lang.String"/>
+
+    <title>
+        <band height="107" splitType="Stretch">
+            <rectangle>
+                <reportElement x="0" y="0" width="610" height="80" backcolor="#E3FFE3" uuid="49e3002d-a67a-4bb3-9254-cf06b1469d7f"/>
+                <graphicElement>
+                    <pen lineWidth="2.0" lineColor="#3AC906"/>
+                </graphicElement>
+            </rectangle>
+            <image onErrorType="Blank">
+                <reportElement x="15" y="10" width="60" height="60" uuid="4b3e5514-d886-405b-b86e-f46cf4e3904e"/>
+                <imageExpression><![CDATA[getClass().getResourceAsStream("/images/goat.png")]]></imageExpression>
+            </image>
+            <textField>
+                <reportElement x="80" y="10" width="520" height="30" forecolor="#11802C" uuid="b3660d03-aa84-4067-b4ab-4989f759ca60"/>
+                <textElement textAlignment="Center" verticalAlignment="Middle">
+                    <font fontName="Arial" size="22" isBold="true"/>
+                </textElement>
+                <textFieldExpression><![CDATA["THÔNG TIN CHI TIẾT NGƯỜI DÙNG"]]></textFieldExpression>
+            </textField>
+            <textField>
+                <reportElement x="178" y="45" width="120" height="20" uuid="a564b36b-efe7-4fb5-a062-0dcd46ef1364"/>
+                <textElement textAlignment="Right" verticalAlignment="Middle">
+                    <font fontName="Arial" size="13"/>
+                </textElement>
+                <textFieldExpression><![CDATA["Ngày xuất bản: "]]></textFieldExpression>
+            </textField>
+            <textField isBlankWhenNull="true">
+                <reportElement x="303" y="45" width="150" height="20" uuid="d772ea61-ce6c-4545-9d0d-b7a9bbbbb8f1"/>
+                <textElement textAlignment="Left" verticalAlignment="Middle">
+                    <font fontName="Arial" size="13" isBold="true" isItalic="true"/>
+                </textElement>
+                <textFieldExpression><![CDATA[$P{REPORT_DATE}]]></textFieldExpression>
+            </textField>
+        </band>
+    </title>
+
+    <detail>
+        <band height="320" splitType="Stretch">
+            <rectangle radius="10">
+                <reportElement x="0" y="10" width="610" height="290" backcolor="#FFFFFF" uuid="e61ba4f1-bc84-44a6-9ba1-bd2de8ad3b66"/>
+                <graphicElement>
+                    <pen lineWidth="1.0" lineColor="#CCCCCC"/>
+                </graphicElement>
+            </rectangle>
+
+            <rectangle radius="5">
+                <reportElement x="30" y="40" width="140" height="160" backcolor="#F9F9F9" uuid="c2f012ba-ef03-4c91-91a1-77ffc2e399bb"/>
+                <graphicElement>
+                    <pen lineWidth="1.0" lineStyle="Dashed" lineColor="#A8A8A8"/>
+                </graphicElement>
+            </rectangle>
+            <image scaleImage="FillFrame" onErrorType="Blank">
+                <reportElement x="35" y="45" width="130" height="150" uuid="bc289a8c-ef0d-4fa2-bad7-ef18c0df1111"/>
+                <imageExpression><![CDATA[$F{avatarUrl} != null && !$F{avatarUrl}.isEmpty() ? $F{avatarUrl} : null]]></imageExpression>
+            </image>
+            <staticText>
+                <reportElement x="30" y="210" width="140" height="20" forecolor="#777777" uuid="3d2ff903-827d-4b95-a1c1-4b1bb6405234"/>
+                <textElement textAlignment="Center" verticalAlignment="Middle">
+                    <font fontName="Arial" size="11" isItalic="true"/>
+                </textElement>
+                <text><![CDATA[Ảnh đại diện]]></text>
+            </staticText>
+
+            <staticText>
+                <reportElement x="200" y="40" width="110" height="25" uuid="5fa75713-39d7-4632-bd97-ce74677943d2"/>
+                <textElement verticalAlignment="Middle">
+                    <font fontName="Arial" size="13" isBold="true"/>
+                </textElement>
+                <text><![CDATA[Họ và tên:]]></text>
+            </staticText>
+            <textField isBlankWhenNull="true">
+                <reportElement x="310" y="40" width="270" height="25" uuid="6bd9ec04-b2b7-4581-9b16-56ad9ecbfa88"/>
+                <textElement verticalAlignment="Middle">
+                    <font fontName="Arial" size="13" isBold="true"/>
+                </textElement>
+                <textFieldExpression><![CDATA[$F{fullName}]]></textFieldExpression>
+            </textField>
+
+            <staticText>
+                <reportElement x="200" y="75" width="110" height="25" uuid="cf82ee33-e53b-4892-9426-3ff4eef7ee27"/>
+                <textElement verticalAlignment="Middle">
+                    <font fontName="Arial" size="13" isBold="true"/>
+                </textElement>
+                <text><![CDATA[Mã tài khoản:]]></text>
+            </staticText>
+            <textField isBlankWhenNull="true">
+                <reportElement x="310" y="75" width="270" height="25" uuid="8a6b1dc2-35bd-449e-b9ee-8651a56ea880"/>
+                <textElement verticalAlignment="Middle">
+                    <font fontName="Arial" size="12"/>
+                </textElement>
+                <textFieldExpression><![CDATA[$F{userId}.toString()]]></textFieldExpression>
+            </textField>
+
+            <staticText>
+                <reportElement x="200" y="110" width="110" height="25" uuid="192a54b3-fce7-490b-ba62-ec7bf2db9674"/>
+                <textElement verticalAlignment="Middle">
+                    <font fontName="Arial" size="13" isBold="true"/>
+                </textElement>
+                <text><![CDATA[Tên đăng nhập:]]></text>
+            </staticText>
+            <textField isBlankWhenNull="true">
+                <reportElement x="310" y="110" width="270" height="25" uuid="7ca7dfb7-08ab-438a-8671-5fa1b6cfba25"/>
+                <textElement verticalAlignment="Middle">
+                    <font fontName="Arial" size="13"/>
+                </textElement>
+                <textFieldExpression><![CDATA[$F{username}]]></textFieldExpression>
+            </textField>
+
+            <staticText>
+                <reportElement x="200" y="145" width="110" height="25" uuid="559b6c08-0193-4a1b-9fb2-e564bd8bf64f"/>
+                <textElement verticalAlignment="Middle">
+                    <font fontName="Arial" size="13" isBold="true"/>
+                </textElement>
+                <text><![CDATA[Email:]]></text>
+            </staticText>
+            <textField isBlankWhenNull="true">
+                <reportElement x="310" y="145" width="270" height="25" uuid="d1bf80c8-472b-4560-8f96-c637a892b1f6"/>
+                <textElement verticalAlignment="Middle">
+                    <font fontName="Arial" size="13"/>
+                </textElement>
+                <textFieldExpression><![CDATA[$F{email}]]></textFieldExpression>
+            </textField>
+
+            <staticText>
+                <reportElement x="200" y="180" width="110" height="25" uuid="93cf4da1-a5bd-44ec-9e5c-7f5ed47937da"/>
+                <textElement verticalAlignment="Middle">
+                    <font fontName="Arial" size="13" isBold="true"/>
+                </textElement>
+                <text><![CDATA[Vai trò:]]></text>
+            </staticText>
+            <textField isBlankWhenNull="true">
+                <reportElement x="310" y="180" width="270" height="25" uuid="efda4ca7-94d8-4f81-ba21-12502c4b8b6e"/>
+                <textElement verticalAlignment="Middle">
+                    <font fontName="Arial" size="13" isBold="true"/>
+                </textElement>
+                <textFieldExpression><![CDATA[$F{roleName}]]></textFieldExpression>
+            </textField>
+
+            <staticText>
+                <reportElement x="200" y="215" width="110" height="25" uuid="b522cbbf-df91-4d7a-8bd4-523ed83a54a7"/>
+                <textElement verticalAlignment="Middle">
+                    <font fontName="Arial" size="13" isBold="true"/>
+                </textElement>
+                <text><![CDATA[Trạng thái:]]></text>
+            </staticText>
+            <textField isBlankWhenNull="true">
+                <reportElement x="310" y="215" width="270" height="25" uuid="26bc0b98-5cda-48c2-bb53-61b47b4d326c"/>
+                <textElement verticalAlignment="Middle">
+                    <font fontName="Arial" size="13"/>
+                </textElement>
+                <textFieldExpression><![CDATA[$F{status}]]></textFieldExpression>
+            </textField>
+
+            <staticText>
+                <reportElement x="200" y="250" width="110" height="25" uuid="3fb8ad4e-5ba1-4c12-b141-8f5963964ff0"/>
+                <textElement verticalAlignment="Middle">
+                    <font fontName="Arial" size="13" isBold="true"/>
+                </textElement>
+                <text><![CDATA[Ngày tham gia:]]></text>
+            </staticText>
+            <textField isBlankWhenNull="true">
+                <reportElement x="310" y="250" width="270" height="25" uuid="797a70a0-06e1-4bf6-b072-b8d4f4e6e66c"/>
+                <textElement verticalAlignment="Middle">
+                    <font fontName="Arial" size="13"/>
+                </textElement>
+                <textFieldExpression><![CDATA[$F{createdAt}.toString()]]></textFieldExpression>
+            </textField>
+        </band>
+    </detail>
+
+    <summary>
+        <band height="100">
+            <rectangle>
+                <reportElement x="0" y="10" width="610" height="80" backcolor="#E3FFE3" uuid="db252262-ce4a-4cf8-8fb1-bde6742ae3e9"/>
+                <graphicElement>
+                    <pen lineWidth="2.0" lineColor="#3AC906"/>
+                </graphicElement>
+            </rectangle>
+            <textField>
+                <reportElement x="20" y="25" width="120" height="20" forecolor="#11802C" uuid="b92b623a-5f57-4a1d-9464-0df21f0eeddb"/>
+                <textElement textAlignment="Left" verticalAlignment="Middle">
+                    <font fontName="Arial" size="15" isBold="true"/>
+                </textElement>
+                <textFieldExpression><![CDATA["Goat Sports"]]></textFieldExpression>
+            </textField>
+            <textField>
+                <reportElement x="20" y="55" width="260" height="20" forecolor="#000000" uuid="b7ff1f97-2ac8-4143-a790-c6ecd74277fc"/>
+                <textElement textAlignment="Left" verticalAlignment="Middle">
+                    <font fontName="Arial" size="14" isBold="false"/>
+                </textElement>
+                <textFieldExpression><![CDATA["Quận 7, Thành phố Hồ Chí Minh"]]></textFieldExpression>
+            </textField>
+            <textField>
+                <reportElement x="339" y="55" width="260" height="20" forecolor="#000000" uuid="690b987a-296a-4805-9043-51e0346f5747"/>
+                <textElement textAlignment="Right" verticalAlignment="Middle">
+                    <font fontName="Arial" size="14" isBold="false"/>
+                </textElement>
+                <textFieldExpression><![CDATA["www.goatsports.com.vn"]]></textFieldExpression>
+            </textField>
+        </band>
+    </summary>
+</jasperReport>

@@ -1,9 +1,11 @@
 package iuh.fit.reportservice.infrastructure.external.client;
 
+import iuh.fit.reportservice.application.dto.report.UserDetailReportResponse;
 import iuh.fit.reportservice.application.dto.report.UserReportResponse;
 import iuh.fit.reportservice.application.dto.response.base.BaseResponse;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 
 import java.util.List;
 
@@ -15,4 +17,7 @@ import java.util.List;
 public interface AuthClient {
     @GetMapping
     BaseResponse<List<UserReportResponse>> getAllUsers();
+
+    @GetMapping("/{userId}")
+    BaseResponse<UserDetailReportResponse> getUserById(@PathVariable String userId);
 }

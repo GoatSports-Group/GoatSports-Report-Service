@@ -2,8 +2,6 @@ package iuh.fit.reportservice.presentation.controller;
 
 import iuh.fit.reportservice.application.port.report.ReportPort;
 import iuh.fit.reportservice.application.enums.FormatType;
-import iuh.fit.reportservice.presentation.request.ReportRequest;
-import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -16,17 +14,20 @@ import org.springframework.web.bind.annotation.*;
 public class ReportController {
     private final ReportPort reportPort;
 
-    @GetMapping("/export")
-    public ResponseEntity<byte[]> exportReport(@Valid @RequestBody ReportRequest request) {
+    @GetMapping("/export/users/{userId}")
+    public ResponseEntity<byte[]> exportUserDetail(
+            @PathVariable("userId") String userId,
+            @RequestParam String format
+    ) {
         try {
-            byte[] data = reportPort.exportReport(request.getFormat(), request.getType());
+            byte[] data = reportPort.exportUserDetail(format, userId);
 
             HttpHeaders headers = new HttpHeaders();
 
-            if (request.getFormat().equalsIgnoreCase(FormatType.PDF.getValue())) {
+            if (format.equalsIgnoreCase(FormatType.PDF.getValue())) {
                 headers.setContentType(MediaType.APPLICATION_PDF);
                 headers.setContentDispositionFormData("attachment", "bao_cao.pdf");
-            } else if (request.getFormat().equalsIgnoreCase(FormatType.XLSX.getValue())) {
+            } else if (format.equalsIgnoreCase(FormatType.XLSX.getValue())) {
                 headers.setContentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"));
                 headers.setContentDispositionFormData("attachment", "bao_cao.xlsx");
             }
