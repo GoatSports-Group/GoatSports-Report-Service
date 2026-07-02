@@ -4,9 +4,10 @@ import iuh.fit.reportservice.application.exception.ServiceException;
 import net.sf.jasperreports.engine.JRException;
 
 import java.io.IOException;
+import java.sql.SQLException;
 
 public interface ReportPort {
-    byte[] exportReport(String format, String type) throws ServiceException, JRException, IOException;
+    byte[] exportUsers(String format) throws ServiceException, JRException, IOException, SQLException;
 
     byte[] exportUserDetail(String format, String userId) throws ServiceException, JRException, IOException;
 }

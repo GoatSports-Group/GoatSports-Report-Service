@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!-- Created with Jaspersoft Studio version 6.8.0.final using JasperReports Library version 6.8.0-2ed8dfabb690ff337a5797129f2cd92902b0c87b  -->
 <jasperReport xmlns="http://jasperreports.sourceforge.net/jasperreports" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://jasperreports.sourceforge.net/jasperreports http://jasperreports.sourceforge.net/xsd/jasperreport.xsd" name="sports" pageWidth="650" pageHeight="842" whenNoDataType="AllSectionsNoDetail" columnWidth="610" leftMargin="20" rightMargin="20" topMargin="20" bottomMargin="20" whenResourceMissingType="Error" uuid="506dd7fc-b831-423d-b781-4d10dbd8761e">
 	<property name="com.jaspersoft.studio.data.defaultdataadapter" value="sports_auth"/>
 	<property name="net.sf.jasperreports.print.create.bookmarks" value="true"/>
@@ -84,44 +85,57 @@
 		</box>
 	</style>
 	<subDataset name="sports_auth" uuid="bdd47267-c0ea-4ba5-b2d7-d2f88aeb9df0">
+		<property name="com.jaspersoft.studio.data.defaultdataadapter" value="sports_auth"/>
 		<queryString>
 			<![CDATA[]]>
 		</queryString>
 	</subDataset>
 	<subDataset name="users" uuid="a90c27e4-0610-4b24-b813-100f2e3f6803">
-		<queryString>
-			<![CDATA[]]>
+		<property name="com.jaspersoft.studio.data.sql.tables" value=""/>
+		<property name="com.jaspersoft.studio.data.defaultdataadapter" value="sports_auth"/>
+		<queryString language="SQL">
+			<![CDATA[SELECT u.user_id "Mã",
+	u.full_name "Họ tên",
+	u.email "Email",
+	r.name "Vai trò",
+	u.status "Trạng thái",
+	u.created_at "Ngày tạo"
+FROM users u
+	join roles r ON
+	 u.role_id = r.role_id]]>
 		</queryString>
-		<field name="userId" class="java.util.UUID">
-			<property name="com.jaspersoft.studio.field.label" value="userId"/>
+		<field name="Mã" class="java.util.UUID">
+			<property name="com.jaspersoft.studio.field.label" value="Mã"/>
 			<property name="com.jaspersoft.studio.field.tree.path" value="users"/>
 		</field>
-		<field name="fullName" class="java.lang.String">
-			<property name="com.jaspersoft.studio.field.label" value="fullName"/>
+		<field name="Họ tên" class="java.lang.String">
+			<property name="com.jaspersoft.studio.field.label" value="Họ tên"/>
 			<property name="com.jaspersoft.studio.field.tree.path" value="users"/>
 		</field>
-		<field name="email" class="java.lang.String">
-			<property name="com.jaspersoft.studio.field.label" value="email"/>
+		<field name="Email" class="java.lang.String">
+			<property name="com.jaspersoft.studio.field.label" value="Email"/>
 			<property name="com.jaspersoft.studio.field.tree.path" value="users"/>
 		</field>
-		<field name="roleName" class="java.lang.String">
-			<property name="com.jaspersoft.studio.field.label" value="roleName"/>
+		<field name="Vai trò" class="java.lang.String">
+			<property name="com.jaspersoft.studio.field.label" value="Vai trò"/>
 			<property name="com.jaspersoft.studio.field.tree.path" value="roles"/>
 		</field>
-		<field name="status" class="java.lang.String">
-			<property name="com.jaspersoft.studio.field.label" value="status"/>
+		<field name="Trạng thái" class="java.lang.String">
+			<property name="com.jaspersoft.studio.field.label" value="Trạng thái"/>
 			<property name="com.jaspersoft.studio.field.tree.path" value="users"/>
 		</field>
-		<field name="createdAt" class="java.time.LocalDateTime">
-			<property name="com.jaspersoft.studio.field.label" value="createdAt"/>
+		<field name="Ngày tạo" class="java.sql.Timestamp">
+			<property name="com.jaspersoft.studio.field.label" value="Ngày tạo"/>
 			<property name="com.jaspersoft.studio.field.tree.path" value="users"/>
 		</field>
-		<variable name="userCount" class="java.lang.Integer" calculation="Count">
-			<variableExpression><![CDATA[$F{userId}]]></variableExpression>
+		<variable name="Mã1" class="java.lang.Integer" resetType="Column" calculation="Count">
+			<variableExpression><![CDATA[$F{Mã}]]></variableExpression>
+		</variable>
+		<variable name="Mã2" class="java.lang.Integer" resetType="Column" calculation="Count">
+			<variableExpression><![CDATA[$F{Mã}]]></variableExpression>
 		</variable>
 	</subDataset>
 	<parameter name="REPORT_DATE" class="java.lang.String"/>
-	<parameter name="CUSTOM_DS" class="net.sf.jasperreports.engine.JRDataSource"/>
 	<queryString>
 		<![CDATA[]]>
 	</queryString>
@@ -176,7 +190,7 @@
 				</reportElement>
 				<jr:table xmlns:jr="http://jasperreports.sourceforge.net/jasperreports/components" xsi:schemaLocation="http://jasperreports.sourceforge.net/jasperreports/components http://jasperreports.sourceforge.net/xsd/components.xsd">
 					<datasetRun subDataset="users" uuid="71963f39-be9f-45ba-88bf-fdeff296105f">
-						<dataSourceExpression><![CDATA[$P{CUSTOM_DS}]]></dataSourceExpression>
+						<connectionExpression><![CDATA[$P{REPORT_CONNECTION}]]></connectionExpression>
 					</datasetRun>
 					<jr:column width="99" uuid="7e635153-ff77-44f1-b899-54d51ba325d8">
 						<property name="com.jaspersoft.studio.components.table.model.column.name" value="Column1"/>
@@ -203,7 +217,7 @@
 								<textElement textAlignment="Center" verticalAlignment="Middle">
 									<font fontName="Arial" size="13"/>
 								</textElement>
-								<textFieldExpression><![CDATA[$F{userId}]]></textFieldExpression>
+								<textFieldExpression><![CDATA[$F{Mã}]]></textFieldExpression>
 							</textField>
 						</jr:detailCell>
 					</jr:column>
@@ -239,7 +253,7 @@
 								<textElement textAlignment="Center" verticalAlignment="Middle">
 									<font fontName="Arial" size="13"/>
 								</textElement>
-								<textFieldExpression><![CDATA[$F{fullName}]]></textFieldExpression>
+								<textFieldExpression><![CDATA[$F{Họ tên}]]></textFieldExpression>
 							</textField>
 						</jr:detailCell>
 					</jr:column>
@@ -272,7 +286,7 @@
 								<textElement textAlignment="Center" verticalAlignment="Middle">
 									<font fontName="Arial" size="14" isBold="true"/>
 								</textElement>
-								<textFieldExpression><![CDATA[$V{userCount}]]></textFieldExpression>
+								<textFieldExpression><![CDATA[$V{Mã2}]]></textFieldExpression>
 							</textField>
 						</jr:columnFooter>
 						<jr:detailCell style="Table 2_TD" height="30">
@@ -281,7 +295,7 @@
 								<textElement textAlignment="Center" verticalAlignment="Middle">
 									<font fontName="Arial" size="13"/>
 								</textElement>
-								<textFieldExpression><![CDATA[$F{email}]]></textFieldExpression>
+								<textFieldExpression><![CDATA[$F{Email}]]></textFieldExpression>
 							</textField>
 						</jr:detailCell>
 					</jr:column>
@@ -310,7 +324,7 @@
 								<textElement textAlignment="Center" verticalAlignment="Middle">
 									<font fontName="Arial" size="13"/>
 								</textElement>
-								<textFieldExpression><![CDATA[$F{roleName}]]></textFieldExpression>
+								<textFieldExpression><![CDATA[$F{Vai trò}]]></textFieldExpression>
 							</textField>
 						</jr:detailCell>
 					</jr:column>
@@ -339,7 +353,7 @@
 								<textElement textAlignment="Center" verticalAlignment="Middle">
 									<font fontName="Arial" size="13"/>
 								</textElement>
-								<textFieldExpression><![CDATA[$F{status}]]></textFieldExpression>
+								<textFieldExpression><![CDATA[$F{Trạng thái}]]></textFieldExpression>
 							</textField>
 						</jr:detailCell>
 					</jr:column>
@@ -368,7 +382,7 @@
 								<textElement textAlignment="Center" verticalAlignment="Middle">
 									<font fontName="Arial" size="13"/>
 								</textElement>
-								<textFieldExpression><![CDATA[$F{createdAt}]]></textFieldExpression>
+								<textFieldExpression><![CDATA[$F{Ngày tạo}]]></textFieldExpression>
 							</textField>
 						</jr:detailCell>
 					</jr:column>

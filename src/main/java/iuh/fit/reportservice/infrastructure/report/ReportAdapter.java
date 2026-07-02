@@ -1,10 +1,8 @@
 package iuh.fit.reportservice.infrastructure.report;
 
 import iuh.fit.reportservice.application.dto.report.UserDetailReportResponse;
-import iuh.fit.reportservice.application.dto.report.UserReportResponse;
 import iuh.fit.reportservice.application.exception.ServiceException;
 import iuh.fit.reportservice.application.port.report.ReportPort;
-import iuh.fit.reportservice.application.enums.DataSourceType;
 import iuh.fit.reportservice.application.enums.FormatType;
 import iuh.fit.reportservice.infrastructure.external.client.AuthClient;
 import lombok.RequiredArgsConstructor;
@@ -15,12 +13,16 @@ import net.sf.jasperreports.engine.export.ooxml.JRXlsxExporter;
 import net.sf.jasperreports.export.SimpleExporterInput;
 import net.sf.jasperreports.export.SimpleOutputStreamExporterOutput;
 import net.sf.jasperreports.export.SimpleXlsxReportConfiguration;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
 
+import javax.sql.DataSource;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.sql.Connection;
+import java.sql.SQLException;
 import java.text.SimpleDateFormat;
 import java.util.*;
 
@@ -31,34 +33,37 @@ public class ReportAdapter implements ReportPort {
 
     private final AuthClient authClient;
 
-    @Override
-    public byte[] exportReport(
-            String format, String type
-    ) throws JRException, IOException, ServiceException
-    {
-        Map<String, Object> parameters = new HashMap<>();
-        parameters.put("CUSTOM_DS", getDataSource(type));
-        parameters.put("REPORT_DATE", getDateFormat());
+    @Qualifier("authDataSource")
+    private final DataSource authDataSource;
 
-        InputStream reportStream = new ClassPathResource(getTemplate(type)).getInputStream();
+    @Override
+    public byte[] exportUsers(
+            String format
+    ) throws ServiceException, JRException, IOException, SQLException
+    {
+        InputStream reportStream = new ClassPathResource("templates/user/users.jrxml").getInputStream();
+
         JasperReport jasperReport = JasperCompileManager.compileReport(reportStream);
 
-        JasperPrint jasperPrint = JasperFillManager.fillReport(
-                jasperReport, parameters, new JREmptyDataSource()
-        );
+        try (Connection connection = authDataSource.getConnection()) {
+            Map<String, Object> parameters = new HashMap<>();
+            parameters.put("REPORT_DATE", getDateFormat());
 
-        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+            JasperPrint jasperPrint = JasperFillManager.fillReport(jasperReport, parameters, connection);
 
-        if (format.equalsIgnoreCase(FormatType.PDF.getValue())) {
-            JasperExportManager.exportReportToPdfStream(jasperPrint, outputStream);
-        } else if (format.equalsIgnoreCase(FormatType.XLSX.getValue())) {
-            final JRXlsxExporter exporter = getJrXlsxExporter(jasperPrint, outputStream);
-            exporter.exportReport();
-        } else {
-            throw new ServiceException("Định dạng không hỗ trợ: " + format);
+            ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+
+            if (format.equalsIgnoreCase(FormatType.PDF.getValue())) {
+                JasperExportManager.exportReportToPdfStream(jasperPrint, outputStream);
+            } else if (format.equalsIgnoreCase(FormatType.XLSX.getValue())) {
+                final JRXlsxExporter exporter = getJrXlsxExporter(jasperPrint, outputStream);
+                exporter.exportReport();
+            } else {
+                throw new ServiceException("Định dạng không hỗ trợ: " + format);
+            }
+
+            return outputStream.toByteArray();
         }
-
-        return outputStream.toByteArray();
     }
 
     @Override
@@ -89,20 +94,6 @@ public class ReportAdapter implements ReportPort {
         }
 
         return outputStream.toByteArray();
-    }
-
-    private JRBeanCollectionDataSource getDataSource(String type) {
-        if(type.equalsIgnoreCase(DataSourceType.USERS.getValue())) {
-            List<UserReportResponse> users = authClient.getAllUsers().getData();
-            log.info(users.toString());
-            return new JRBeanCollectionDataSource(users);
-        }
-
-        return new JRBeanCollectionDataSource(null);
-    }
-
-    private String getTemplate(String type) {
-        return "templates/" + type + ".jrxml";
     }
 
     private String getDateFormat() {
