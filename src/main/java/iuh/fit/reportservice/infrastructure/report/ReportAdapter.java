@@ -10,6 +10,7 @@ import lombok.extern.slf4j.Slf4j;
 import net.sf.jasperreports.engine.*;
 import net.sf.jasperreports.engine.data.JRBeanCollectionDataSource;
 import net.sf.jasperreports.engine.export.ooxml.JRXlsxExporter;
+import net.sf.jasperreports.engine.util.JRLoader;
 import net.sf.jasperreports.export.SimpleExporterInput;
 import net.sf.jasperreports.export.SimpleOutputStreamExporterOutput;
 import net.sf.jasperreports.export.SimpleXlsxReportConfiguration;
@@ -41,9 +42,8 @@ public class ReportAdapter implements ReportPort {
             String format
     ) throws ServiceException, JRException, IOException, SQLException
     {
-        InputStream reportStream = new ClassPathResource("templates/user/users.jrxml").getInputStream();
-
-        JasperReport jasperReport = JasperCompileManager.compileReport(reportStream);
+        InputStream reportStream = new ClassPathResource("templates/jasper/user/users.jasper").getInputStream();
+        JasperReport jasperReport = (JasperReport) JRLoader.loadObject(reportStream);
 
         try (Connection connection = authDataSource.getConnection()) {
             Map<String, Object> parameters = new HashMap<>();
@@ -75,8 +75,8 @@ public class ReportAdapter implements ReportPort {
         Map<String, Object> parameters = new HashMap<>();
         parameters.put("REPORT_DATE", getDateFormat());
 
-        InputStream reportStream = new ClassPathResource("templates/user/user-detail.jrxml").getInputStream();
-        JasperReport jasperReport = JasperCompileManager.compileReport(reportStream);
+        InputStream reportStream = new ClassPathResource("templates/jasper/user/user-detail.jasper").getInputStream();
+        JasperReport jasperReport = (JasperReport) JRLoader.loadObject(reportStream);
 
         JasperPrint jasperPrint = JasperFillManager.fillReport(
                 jasperReport, parameters, dataSource
