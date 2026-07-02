@@ -1,9 +1,15 @@
 package iuh.fit.reportservice.infrastructure.report;
 
+import iuh.fit.reportservice.application.dto.report.UserReportResponse;
 import iuh.fit.reportservice.application.exception.ServiceException;
 import iuh.fit.reportservice.application.port.report.ReportPort;
+import iuh.fit.reportservice.application.enums.DataSourceType;
+import iuh.fit.reportservice.application.enums.FormatType;
+import iuh.fit.reportservice.infrastructure.external.client.AuthClient;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import net.sf.jasperreports.engine.*;
+import net.sf.jasperreports.engine.data.JRBeanCollectionDataSource;
 import net.sf.jasperreports.engine.export.ooxml.JRXlsxExporter;
 import net.sf.jasperreports.export.SimpleExporterInput;
 import net.sf.jasperreports.export.SimpleOutputStreamExporterOutput;
@@ -11,53 +17,71 @@ import net.sf.jasperreports.export.SimpleXlsxReportConfiguration;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
 
-import javax.sql.DataSource;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.sql.Connection;
-import java.sql.SQLException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class ReportAdapter implements ReportPort {
-    private final DataSource dataSource;
+
+    private final AuthClient authClient;
 
     @Override
     public byte[] exportReport(
-            String format, Map<String, Object> parameters
-    ) throws ServiceException, JRException, IOException, SQLException
+            String format, String type
+    ) throws JRException, IOException, ServiceException
     {
-        InputStream reportStream = new ClassPathResource("templates/sports.jrxml").getInputStream();
+        Map<String, Object> parameters = new HashMap<>();
+        parameters.put("CUSTOM_DS", getDataSource(type));
+        parameters.put("REPORT_DATE", getDateFormat());
 
+        InputStream reportStream = new ClassPathResource(getTemplate(type)).getInputStream();
         JasperReport jasperReport = JasperCompileManager.compileReport(reportStream);
 
-        try (Connection connection = dataSource.getConnection()) {
-            SimpleDateFormat formatter = new SimpleDateFormat("dd/MM/yyyy");
-            String formattedDate = formatter.format(new Date());
-            parameters.put("REPORT_DATE", formattedDate);
+        JasperPrint jasperPrint = JasperFillManager.fillReport(
+                jasperReport, parameters, new JREmptyDataSource()
+        );
 
-            JasperPrint jasperPrint = JasperFillManager.fillReport(jasperReport, parameters, connection);
+        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
 
-            ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-
-            if ("pdf".equalsIgnoreCase(format)) {
-                JasperExportManager.exportReportToPdfStream(jasperPrint, outputStream);
-            } else if ("xlsx".equalsIgnoreCase(format)) {
-                final JRXlsxExporter exporter = getJrXlsxExporter(jasperPrint, outputStream);
-                exporter.exportReport();
-            } else {
-                throw new IllegalArgumentException("Định dạng không hỗ trợ: " + format);
-            }
-
-            return outputStream.toByteArray();
+        if (format.equalsIgnoreCase(FormatType.PDF.getValue())) {
+            JasperExportManager.exportReportToPdfStream(jasperPrint, outputStream);
+        } else if (format.equalsIgnoreCase(FormatType.XLSX.getValue())) {
+            final JRXlsxExporter exporter = getJrXlsxExporter(jasperPrint, outputStream);
+            exporter.exportReport();
+        } else {
+            throw new ServiceException("Định dạng không hỗ trợ: " + format);
         }
+
+        return outputStream.toByteArray();
     }
 
-    private static JRXlsxExporter getJrXlsxExporter(JasperPrint jasperPrint, ByteArrayOutputStream outputStream) {
+    private JRBeanCollectionDataSource getDataSource(String type) {
+        if(type.equalsIgnoreCase(DataSourceType.USERS.getValue())) {
+            List<UserReportResponse> users = authClient.getAllUsers().getData();
+            log.info(users.toString());
+            return new JRBeanCollectionDataSource(users);
+        }
+
+        return new JRBeanCollectionDataSource(null);
+    }
+
+    private String getTemplate(String type) {
+        return "templates/" + type + ".jrxml";
+    }
+
+    private String getDateFormat() {
+        return new SimpleDateFormat("dd/MM/yyyy").format(new Date());
+    }
+
+    private JRXlsxExporter getJrXlsxExporter(JasperPrint jasperPrint, ByteArrayOutputStream outputStream) {
         JRXlsxExporter exporter = new JRXlsxExporter();
         exporter.setExporterInput(new SimpleExporterInput(jasperPrint));
         exporter.setExporterOutput(new SimpleOutputStreamExporterOutput(outputStream));
