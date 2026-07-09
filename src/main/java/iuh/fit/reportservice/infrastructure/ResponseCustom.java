@@ -31,6 +31,10 @@ public class ResponseCustom implements ResponseBodyAdvice<Object> {
             return body;
         }
 
+        if (!MediaType.APPLICATION_JSON.includes(selectedContentType)) {
+            return body;
+        }
+
         if (body instanceof String) {
             return body;
         }

@@ -24,7 +24,7 @@ import java.util.stream.Stream;
 @Component
 public class JwtFilter extends OncePerRequestFilter {
 
-    @Value("${gateway.internal-secret}")
+    @Value("${app.jwt.secret}")
     private String gatewaySecret;
 
     @Override
