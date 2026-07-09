@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
+import org.springframework.http.MediaType;
 import java.util.List;
 
 @ControllerAdvice
@@ -22,25 +23,31 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     ResponseEntity<BaseResponse<Object>> handleAllExceptions(Exception e){
+        e.printStackTrace();
         BaseResponse<Object> response = new BaseResponse<>();
         response.setStatusCode(HttpStatus.BAD_REQUEST.value());
         response.setMessage(e.getMessage());
         response.setError("Có lỗi xảy ra");
 
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(response);
     }
 
     @ExceptionHandler(value = {
             ServiceException.class
     })
     ResponseEntity<Object> handleServiceException(ServiceException e) {
+        e.printStackTrace();
         BaseResponse<Object> response = new BaseResponse<>();
 
         response.setStatusCode(HttpStatus.BAD_REQUEST.value());
         response.setMessage(e.getMessage());
         response.setError("Có lỗi xảy ra");
 
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(response);
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
@@ -53,14 +60,18 @@ public class GlobalExceptionHandler {
         if (list.isEmpty()) {
             res.setError("Có lỗi xảy ra");
             res.setMessage("Không tìm thấy dữ liệu hợp lệ");
-            return ResponseEntity.badRequest().body(res);
+            return ResponseEntity.badRequest()
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(res);
         }
 
         List<String> messages = list.stream().map(DefaultMessageSourceResolvable::getDefaultMessage).toList();
         res.setError(e.getBody().getDetail());
         res.setMessage(messages.size() > 1 ? messages : messages.getFirst());
 
-        return ResponseEntity.badRequest().body(res);
+        return ResponseEntity.badRequest()
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(res);
     }
 
     @ExceptionHandler(NoResourceFoundException.class)
@@ -70,7 +81,9 @@ public class GlobalExceptionHandler {
         response.setMessage(e.getMessage());
         response.setError("Đường dẫn không tồn tại");
 
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(response);
     }
 
 }
