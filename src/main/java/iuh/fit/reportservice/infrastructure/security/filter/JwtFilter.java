@@ -57,7 +57,6 @@ public class JwtFilter extends OncePerRequestFilter {
             String userId = request.getHeader("X-User-Id");
             String username = request.getHeader("X-User-Username");
             String email = request.getHeader("X-User-Email");
-            String role = request.getHeader("X-User-Roles");
             String authoritiesRaw = request.getHeader("X-User-Authorities");
 
             List<SimpleGrantedAuthority> authorities = Collections.emptyList();
@@ -66,16 +65,6 @@ public class JwtFilter extends OncePerRequestFilter {
                         .map(String::trim)
                         .filter(s -> !s.isBlank())
                         .map(SimpleGrantedAuthority::new)
-                        .toList();
-            }
-
-            if (hasText(role)) {
-                String roleName = normalizeRole(role);
-                List<SimpleGrantedAuthority> roleAuthorities = List.of(new SimpleGrantedAuthority(roleName));
-                authorities = authorities.isEmpty()
-                        ? roleAuthorities
-                        : Stream.concat(authorities.stream(), roleAuthorities.stream())
-                        .distinct()
                         .toList();
             }
 
@@ -104,9 +93,5 @@ public class JwtFilter extends OncePerRequestFilter {
 
     private boolean hasText(String value) {
         return value != null && !value.isBlank();
-    }
-
-    private String normalizeRole(String role) {
-        return role.replaceFirst("^ROLE_", "").toUpperCase();
     }
 }

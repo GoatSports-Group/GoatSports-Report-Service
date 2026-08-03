@@ -12,11 +12,11 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/v1/reports")
 @RequiredArgsConstructor
-@PreAuthorize("hasAuthority('ADMIN')")
 public class ReportController {
     private final ReportPort reportPort;
 
     @GetMapping("/export/users")
+    @PreAuthorize("hasAuthority('EXPORT_USERS')")
     public ResponseEntity<byte[]> exportUsers(@RequestParam("format") String format) {
         try {
             byte[] data = reportPort.exportUsers(format);
@@ -29,6 +29,7 @@ public class ReportController {
     }
 
     @GetMapping("/export/users/{userId}")
+    @PreAuthorize("hasAuthority('EXPORT_USER')")
     public ResponseEntity<byte[]> exportUserDetail(
             @PathVariable("userId") String userId,
             @RequestParam String format
