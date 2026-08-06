@@ -150,6 +150,12 @@
                             minhdat1312/${project.artifactId}
                         </image>
                     </to>
+                    <container>
+                        <jvmFlags>
+                            <jvmFlag>-Djava.security.egd=file:/dev/./urandom</jvmFlag>
+                            <jvmFlag>-XX:+UseG1GC</jvmFlag>
+                        </jvmFlags>
+                    </container>
                 </configuration>
             </plugin>
             <plugin>
