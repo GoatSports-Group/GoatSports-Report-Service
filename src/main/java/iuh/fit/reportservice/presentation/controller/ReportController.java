@@ -2,6 +2,7 @@ package iuh.fit.reportservice.presentation.controller;
 
 import iuh.fit.reportservice.application.port.report.ReportPort;
 import iuh.fit.reportservice.application.enums.FormatType;
+import iuh.fit.shared.annotation.AuditLog;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -17,6 +18,7 @@ public class ReportController {
 
     @GetMapping("/export/users")
     @PreAuthorize("hasAuthority('EXPORT_USERS')")
+    @AuditLog(action = "EXPORT_USERS", description = "Xuất danh sách người dùng")
     public ResponseEntity<byte[]> exportUsers(@RequestParam("format") String format) {
         try {
             byte[] data = reportPort.exportUsers(format);
@@ -30,6 +32,7 @@ public class ReportController {
 
     @GetMapping("/export/users/{userId}")
     @PreAuthorize("hasAuthority('EXPORT_USER')")
+    @AuditLog(action = "EXPORT_USER", description = "Xuất thông tin người dùng #{#userId}")
     public ResponseEntity<byte[]> exportUserDetail(
             @PathVariable("userId") String userId,
             @RequestParam String format

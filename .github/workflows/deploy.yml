@@ -18,6 +18,9 @@ jobs:
           java-version: '21'
           distribution: 'corretto'
 
+      - name: Build Shared Kernel
+        run: mvn -f shared-kernel/pom.xml clean install -DskipTests
+
       - name: Build & Push Docker Image with Jib
         run: |
           mvn clean compile jib:build \
