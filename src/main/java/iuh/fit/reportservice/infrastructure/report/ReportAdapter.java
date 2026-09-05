@@ -1,6 +1,11 @@
 package iuh.fit.reportservice.infrastructure.report;
 
+import com.google.zxing.BarcodeFormat;
+import com.google.zxing.WriterException;
+import com.google.zxing.common.BitMatrix;
+import com.google.zxing.qrcode.QRCodeWriter;
 import iuh.fit.reportservice.application.dto.report.OwnerBookingReportFilter;
+import iuh.fit.reportservice.application.dto.report.OwnerBookingInvoiceReport;
 import iuh.fit.reportservice.application.dto.report.OwnerBookingReportRow;
 import iuh.fit.reportservice.application.dto.report.UserDetailReportResponse;
 import iuh.fit.reportservice.application.dto.response.base.BaseResponse;
@@ -26,7 +31,9 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
 
+import javax.imageio.ImageIO;
 import javax.sql.DataSource;
+import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -34,6 +41,7 @@ import java.io.InputStream;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.text.SimpleDateFormat;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 
@@ -45,10 +53,12 @@ public class ReportAdapter implements ReportPort {
     private static final int MAX_BOOKING_EXPORT_ROWS = 10_000;
     private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("dd/MM/yyyy");
     private static final DateTimeFormatter TIME_FORMAT = DateTimeFormatter.ofPattern("HH:mm");
+    private static final DateTimeFormatter DATE_TIME_FORMAT = DateTimeFormatter.ofPattern("dd/MM/yyyy - HH:mm");
 
     private final AuthClient authClient;
     private final VenueClient venueClient;
     private JasperReport ownerBookingReport;
+    private JasperReport ownerBookingInvoiceReport;
     private byte[] ownerBookingLogo;
 
     @Qualifier("authDataSource")
@@ -60,13 +70,18 @@ public class ReportAdapter implements ReportPort {
         try (InputStream reportStream = new ClassPathResource(
                 "templates/jasper/owner-booking/owner-bookings.jasper"
         ).getInputStream();
+             InputStream invoiceStream = new ClassPathResource(
+                     "templates/jasper/owner-booking/owner-booking-invoice.jasper"
+             ).getInputStream();
              InputStream logoStream = new ClassPathResource("images/goat-report.png").getInputStream()) {
             JasperReport loadedReport = (JasperReport) JRLoader.loadObject(reportStream);
+            JasperReport loadedInvoiceReport = (JasperReport) JRLoader.loadObject(invoiceStream);
             byte[] loadedLogo = logoStream.readAllBytes();
 
             warmUpOwnerBookingExporters(loadedReport, loadedLogo);
 
             ownerBookingReport = loadedReport;
+            ownerBookingInvoiceReport = loadedInvoiceReport;
             ownerBookingLogo = loadedLogo;
             log.info("Owner booking report engine initialized in {} ms", elapsedMillis(startedAt));
         } catch (IOException | JRException exception) {
@@ -178,6 +193,230 @@ public class ReportAdapter implements ReportPort {
             );
             return reportBytes;
         }
+    }
+
+    @Override
+    public byte[] exportOwnerBookingInvoice(UUID bookingId)
+            throws ServiceException, JRException, IOException {
+        if (bookingId == null) throw new ServiceException("Mã đơn đặt sân là bắt buộc để tạo hóa đơn.");
+
+        long startedAt = System.nanoTime();
+        BaseResponse<VenueOwnerBookingResponse> response = venueClient.getOwnerBooking(bookingId);
+        VenueOwnerBookingResponse booking = response == null ? null : response.getData();
+        if (booking == null) {
+            throw new ServiceException("Dịch vụ quản lý sân không trả dữ liệu đơn đặt sân để tạo hóa đơn.");
+        }
+        long dataLoadedAt = System.nanoTime();
+        OwnerBookingInvoiceReport invoice = toOwnerBookingInvoice(booking);
+        Map<String, Object> parameters = new HashMap<>();
+        byte[] bookingQr = generateQrCode(booking.getQrCode());
+
+        try (InputStream logoStream = new ByteArrayInputStream(ownerBookingLogo);
+             ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
+            parameters.put("LOGO", logoStream);
+            parameters.put("QR_CODE", bookingQr == null ? null : new ByteArrayInputStream(bookingQr));
+            JasperPrint jasperPrint = JasperFillManager.fillReport(
+                    ownerBookingInvoiceReport,
+                    parameters,
+                    new JRBeanCollectionDataSource(Collections.singletonList(invoice))
+            );
+            long reportFilledAt = System.nanoTime();
+            JasperExportManager.exportReportToPdfStream(jasperPrint, outputStream);
+            byte[] reportBytes = outputStream.toByteArray();
+            long completedAt = System.nanoTime();
+            log.info(
+                    "Owner booking invoice generated: bookingId={}, fetch={} ms, fill={} ms, export={} ms, total={} ms, bytes={}",
+                    bookingId,
+                    elapsedMillis(startedAt, dataLoadedAt),
+                    elapsedMillis(dataLoadedAt, reportFilledAt),
+                    elapsedMillis(reportFilledAt, completedAt),
+                    elapsedMillis(startedAt, completedAt),
+                    reportBytes.length
+            );
+            return reportBytes;
+        }
+    }
+
+    private OwnerBookingInvoiceReport toOwnerBookingInvoice(VenueOwnerBookingResponse booking) {
+        double total = nonNegative(booking.getTotalPrice());
+        double paid = paidAmount(booking, total);
+        boolean fullyPaid = isPaid(booking) || paid + 0.01D >= total;
+        if (fullyPaid) paid = total;
+        double outstanding = fullyPaid ? 0D : Math.max(0D, total - paid);
+        VenueOwnerPaymentResponse payment = displayPayment(booking);
+
+        return OwnerBookingInvoiceReport.builder()
+                .invoiceNumber("HD-" + valueOrDash(booking.getBookingCode()))
+                .issuedAt(getDateTimeFormat())
+                .bookingCode(valueOrDash(booking.getBookingCode()))
+                .bookingStatus(bookingStatusLabel(booking.getStatus()))
+                .createdAt(formatTimelineDateTime(booking.getCreatedAt()))
+                .customerName(customerName(booking))
+                .customerPhone(valueOrDash(booking.getWalkInCustomerPhone()))
+                .customerType(bookingChannelLabel(booking.getSource()))
+                .venueName(valueOrDash(booking.getVenueName()))
+                .courtName(valueOrDash(booking.getCourtName()))
+                .playDate(booking.getPlayDate() == null ? "—" : DATE_FORMAT.format(booking.getPlayDate()))
+                .timeRange(timeRange(booking))
+                .bookingChannel(bookingChannelLabel(booking.getSource()))
+                .itemDescription("Tiền sân " + valueOrDash(booking.getCourtName()) + " · " + timeRange(booking))
+                .totalAmount(formatMoney(total))
+                .serviceFeeAmount(formatMoney(0D))
+                .discountAmount(formatMoney(0D))
+                .finalAmount(formatMoney(total))
+                .depositAmount(formatMoney(nonNegative(booking.getDepositAmount())))
+                .paidAmount(formatMoney(paid))
+                .outstandingAmount(formatMoney(outstanding))
+                .paymentMethod(paymentMethodLabel(payment))
+                .transactionCode(payment == null ? "—" : valueOrDash(payment.getProviderTransactionId()))
+                .paymentStatus(invoicePaymentStatus(booking, paid, total, fullyPaid))
+                .paidAt(payment == null || payment.getPaidAt() == null
+                        ? "—"
+                        : DATE_TIME_FORMAT.format(payment.getPaidAt()))
+                .historyLines(historyLines(booking))
+                .build();
+    }
+
+    private byte[] generateQrCode(String content) throws IOException {
+        String normalized = blankToNull(content);
+        if (normalized == null) return null;
+        try {
+            BitMatrix matrix = new QRCodeWriter().encode(normalized, BarcodeFormat.QR_CODE, 240, 240);
+            BufferedImage image = new BufferedImage(matrix.getWidth(), matrix.getHeight(), BufferedImage.TYPE_INT_RGB);
+            for (int y = 0; y < matrix.getHeight(); y++) {
+                for (int x = 0; x < matrix.getWidth(); x++) {
+                    image.setRGB(x, y, matrix.get(x, y) ? 0xFF0B201B : 0xFFFFFFFF);
+                }
+            }
+            try (ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+                ImageIO.write(image, "png", output);
+                return output.toByteArray();
+            }
+        } catch (WriterException exception) {
+            throw new IOException("Không thể tạo mã QR cho hóa đơn đơn đặt sân.", exception);
+        }
+    }
+
+    private String historyLines(VenueOwnerBookingResponse booking) {
+        List<String> lines = new ArrayList<>();
+        lines.add(formatTimelineDateTime(booking.getCreatedAt()) + "   Tạo đơn đặt sân");
+        payments(booking).stream()
+                .sorted(Comparator.comparing(this::paymentTimestamp, Comparator.nullsLast(Comparator.naturalOrder())))
+                .forEach(payment -> lines.add(
+                        formatTimelineDateTime(paymentTimestamp(payment)) + "   " + paymentTimelineLabel(payment)
+                ));
+        lines.add(formatTimelineDateTime(
+                booking.getUpdatedAt() == null ? booking.getCreatedAt() : booking.getUpdatedAt()
+        ) + "   " + bookingStatusLabel(booking.getStatus()));
+        return String.join("\n", lines);
+    }
+
+    private String paymentTimelineLabel(VenueOwnerPaymentResponse payment) {
+        String label = "BOOKING_DEPOSIT".equals(payment.getPurpose())
+                ? "Thanh toán tiền cọc"
+                : "Thanh toán còn lại";
+        if ("SUCCEEDED".equals(payment.getStatus())) return label;
+        return label + " – " + paymentAttemptStatusLabel(payment.getStatus());
+    }
+
+    private String paymentAttemptStatusLabel(String status) {
+        if (status == null) return "Chưa ghi nhận";
+        return switch (status) {
+            case "CREATED", "PENDING" -> "Đang chờ";
+            case "FAILED" -> "Thất bại";
+            case "EXPIRED" -> "Hết hạn";
+            case "CANCELLED" -> "Đã hủy";
+            case "SUCCEEDED" -> "Thành công";
+            default -> status;
+        };
+    }
+
+    private String formatTimelineDateTime(LocalDateTime value) {
+        return value == null ? "—" : DateTimeFormatter.ofPattern("HH:mm dd/MM/yyyy").format(value);
+    }
+
+    private double paidAmount(VenueOwnerBookingResponse booking, double total) {
+        List<VenueOwnerPaymentResponse> succeeded = payments(booking).stream()
+                .filter(payment -> "SUCCEEDED".equals(payment.getStatus()))
+                .toList();
+        double paid = succeeded.stream().mapToDouble(payment -> nonNegative(payment.getAmount())).sum();
+        Set<UUID> succeededIds = succeeded.stream()
+                .map(VenueOwnerPaymentResponse::getPaymentId)
+                .filter(Objects::nonNull)
+                .collect(java.util.stream.Collectors.toSet());
+        if (booking.getDepositPaymentId() != null && !succeededIds.contains(booking.getDepositPaymentId())) {
+            paid += nonNegative(booking.getDepositAmount());
+        }
+        if (booking.getRemainingPaymentId() != null && !succeededIds.contains(booking.getRemainingPaymentId())) {
+            paid += nonNegative(booking.getRemainingAmount());
+        }
+        return Math.min(total, Math.max(0D, paid));
+    }
+
+    private VenueOwnerPaymentResponse displayPayment(VenueOwnerBookingResponse booking) {
+        List<VenueOwnerPaymentResponse> sorted = payments(booking).stream()
+                .sorted(Comparator.comparing(this::paymentTimestamp, Comparator.nullsLast(Comparator.reverseOrder())))
+                .toList();
+        return sorted.stream().filter(this::hasPaymentMethod).findFirst()
+                .orElse(sorted.isEmpty() ? null : sorted.get(0));
+    }
+
+    private LocalDateTime paymentTimestamp(VenueOwnerPaymentResponse payment) {
+        return payment.getPaidAt() != null ? payment.getPaidAt() : payment.getCreatedAt();
+    }
+
+    private boolean hasPaymentMethod(VenueOwnerPaymentResponse payment) {
+        return payment != null && (blankToNull(payment.getMethod()) != null
+                || blankToNull(payment.getProvider()) != null
+                || blankToNull(payment.getProviderTransactionId()) != null);
+    }
+
+    private String paymentMethodLabel(VenueOwnerPaymentResponse payment) {
+        if (payment == null) return "—";
+        String method = blankToNull(payment.getMethod());
+        String provider = blankToNull(payment.getProvider());
+        String transactionCode = blankToNull(payment.getProviderTransactionId());
+        if ("CASH".equalsIgnoreCase(method)
+                || transactionCode != null && transactionCode.toUpperCase(Locale.ROOT).startsWith("CASH-")) {
+            return "Tiền mặt";
+        }
+        if ("BANK_TRANSFER".equalsIgnoreCase(method) || "PAYOS".equalsIgnoreCase(provider)) {
+            return "Ví điện tử (PayOS)";
+        }
+        return "—";
+    }
+
+    private String invoicePaymentStatus(
+            VenueOwnerBookingResponse booking,
+            double paid,
+            double total,
+            boolean fullyPaid
+    ) {
+        if (fullyPaid) return "Đã thanh toán đủ";
+        if (paid > 0D && paid < total) return "Chưa thanh toán đủ";
+        if (payments(booking).stream().anyMatch(payment -> Set.of("CREATED", "PENDING").contains(payment.getStatus()))) {
+            return "Đang chờ thanh toán";
+        }
+        if (hasFailedPayment(booking)) return "Thanh toán chưa thành công";
+        return "Chưa thanh toán";
+    }
+
+    private String bookingChannelLabel(String source) {
+        if (source == null) return "—";
+        return switch (source) {
+            case "WALK_IN" -> "Khách tại quầy";
+            case "DIRECT" -> "Đặt trực tuyến";
+            case "AI_MATCHMAKING" -> "Ghép trận";
+            default -> source;
+        };
+    }
+
+    private double nonNegative(Double value) {
+        return value == null ? 0D : Math.max(0D, value);
+    }
+
+    private String formatMoney(double value) {
+        return String.format(Locale.of("vi", "VN"), "%,.0fđ", value);
     }
 
     private void warmUpOwnerBookingExporters(JasperReport report, byte[] logo) throws JRException {

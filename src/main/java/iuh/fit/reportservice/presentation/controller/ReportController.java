@@ -95,6 +95,30 @@ public class ReportController {
                 .body(data);
     }
 
+    @GetMapping("/export/owner-bookings/{bookingId}/invoice")
+    @PreAuthorize("hasAuthority('GET_OWN_BOOKING')")
+    @AuditLog(action = "EXPORT_OWNER_BOOKING_INVOICE", description = "Xuất hóa đơn PDF cho đơn đặt sân #{#bookingId}")
+    public ResponseEntity<byte[]> exportOwnerBookingInvoice(@PathVariable UUID bookingId) throws Exception {
+        byte[] data = reportPort.exportOwnerBookingInvoice(bookingId);
+        return getResponseEntity("pdf", "hoa-don-dat-san-" + bookingId + ".pdf", data);
+    }
+
+    @GetMapping("/preview/owner-bookings/{bookingId}/invoice")
+    @PreAuthorize("hasAuthority('GET_OWN_BOOKING')")
+    @AuditLog(action = "PREVIEW_OWNER_BOOKING_INVOICE", description = "Xem trước hóa đơn PDF cho đơn đặt sân #{#bookingId}")
+    public ResponseEntity<byte[]> previewOwnerBookingInvoice(@PathVariable UUID bookingId) throws Exception {
+        byte[] data = reportPort.exportOwnerBookingInvoice(bookingId);
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_PDF);
+        headers.setContentDisposition(ContentDisposition.inline()
+                .filename("hoa-don-dat-san.pdf")
+                .build());
+        return ResponseEntity.ok()
+                .headers(headers)
+                .header(HttpHeaders.CACHE_CONTROL, "no-store")
+                .body(data);
+    }
+
     private OwnerBookingReportFilter ownerBookingFilter(
             UUID venueId,
             UUID venueCourtId,

@@ -2,10 +2,12 @@ package iuh.fit.reportservice.infrastructure.external.client;
 
 import iuh.fit.reportservice.application.dto.response.base.BaseResponse;
 import iuh.fit.reportservice.application.dto.venue.VenueOwnerBookingPageResponse;
+import iuh.fit.reportservice.application.dto.venue.VenueOwnerBookingResponse;
 import iuh.fit.reportservice.infrastructure.config.VenueClientConfig;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
 
 import java.time.LocalDate;
@@ -17,6 +19,11 @@ import java.util.UUID;
         configuration = VenueClientConfig.class
 )
 public interface VenueClient {
+    @GetMapping("/api/v1/owner/bookings/{bookingId}")
+    BaseResponse<VenueOwnerBookingResponse> getOwnerBooking(
+            @PathVariable("bookingId") UUID bookingId
+    );
+
     @GetMapping("/api/v1/owner/bookings")
     BaseResponse<VenueOwnerBookingPageResponse> getOwnerBookings(
             @RequestParam(required = false) UUID venueId,
