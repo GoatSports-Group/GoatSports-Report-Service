@@ -2,6 +2,7 @@ package iuh.fit.reportservice.infrastructure.exception;
 
 import iuh.fit.reportservice.application.dto.response.base.BaseResponse;
 import iuh.fit.reportservice.application.exception.ServiceException;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.support.DefaultMessageSourceResolvable;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
@@ -12,6 +13,7 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import org.springframework.http.MediaType;
@@ -19,7 +21,13 @@ import java.util.List;
 
 @ControllerAdvice
 @Order(Ordered.HIGHEST_PRECEDENCE)
+@Slf4j
 public class GlobalExceptionHandler {
+
+    @ExceptionHandler(AsyncRequestNotUsableException.class)
+    void handleClientDisconnect(AsyncRequestNotUsableException exception) {
+        log.debug("Máy khách đã đóng kết nối trước khi nhận xong nội dung báo cáo: {}", exception.getMessage());
+    }
 
     @ExceptionHandler(Exception.class)
     ResponseEntity<BaseResponse<Object>> handleAllExceptions(Exception e){

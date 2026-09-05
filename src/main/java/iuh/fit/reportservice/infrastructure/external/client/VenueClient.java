@@ -1,0 +1,31 @@
+package iuh.fit.reportservice.infrastructure.external.client;
+
+import iuh.fit.reportservice.application.dto.response.base.BaseResponse;
+import iuh.fit.reportservice.application.dto.venue.VenueOwnerBookingPageResponse;
+import iuh.fit.reportservice.infrastructure.config.VenueClientConfig;
+import org.springframework.cloud.openfeign.FeignClient;
+import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+
+import java.time.LocalDate;
+import java.util.UUID;
+
+@FeignClient(
+        name = "GOATSPORTS-VENUE-SERVICE",
+        url = "${venue.service.url}",
+        configuration = VenueClientConfig.class
+)
+public interface VenueClient {
+    @GetMapping("/api/v1/owner/bookings")
+    BaseResponse<VenueOwnerBookingPageResponse> getOwnerBookings(
+            @RequestParam(required = false) UUID venueId,
+            @RequestParam(required = false) UUID venueCourtId,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String query,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate,
+            @RequestParam int page,
+            @RequestParam int size
+    );
+}
