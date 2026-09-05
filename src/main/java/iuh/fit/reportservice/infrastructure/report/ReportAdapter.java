@@ -7,11 +7,15 @@ import com.google.zxing.qrcode.QRCodeWriter;
 import iuh.fit.reportservice.application.dto.report.OwnerBookingReportFilter;
 import iuh.fit.reportservice.application.dto.report.OwnerBookingInvoiceReport;
 import iuh.fit.reportservice.application.dto.report.OwnerBookingReportRow;
+import iuh.fit.reportservice.application.dto.report.OwnerRevenueReportFilter;
+import iuh.fit.reportservice.application.dto.report.OwnerRevenueReportRow;
 import iuh.fit.reportservice.application.dto.report.UserDetailReportResponse;
 import iuh.fit.reportservice.application.dto.response.base.BaseResponse;
 import iuh.fit.reportservice.application.dto.venue.VenueOwnerBookingPageResponse;
 import iuh.fit.reportservice.application.dto.venue.VenueOwnerBookingResponse;
 import iuh.fit.reportservice.application.dto.venue.VenueOwnerPaymentResponse;
+import iuh.fit.reportservice.application.dto.venue.VenueOwnerRevenueResponse;
+import iuh.fit.reportservice.application.dto.venue.VenueOwnerDailyRevenueResponse;
 import iuh.fit.reportservice.application.exception.ServiceException;
 import iuh.fit.reportservice.application.port.report.ReportPort;
 import iuh.fit.reportservice.application.enums.FormatType;
@@ -38,6 +42,7 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.math.BigDecimal;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.text.SimpleDateFormat;
@@ -59,6 +64,7 @@ public class ReportAdapter implements ReportPort {
     private final VenueClient venueClient;
     private JasperReport ownerBookingReport;
     private JasperReport ownerBookingInvoiceReport;
+    private JasperReport ownerRevenueReport;
     private byte[] ownerBookingLogo;
 
     @Qualifier("authDataSource")
@@ -73,15 +79,20 @@ public class ReportAdapter implements ReportPort {
              InputStream invoiceStream = new ClassPathResource(
                      "templates/jasper/owner-booking/owner-booking-invoice.jasper"
              ).getInputStream();
+             InputStream revenueStream = new ClassPathResource(
+                     "templates/jasper/owner-revenue/owner-revenue.jasper"
+             ).getInputStream();
              InputStream logoStream = new ClassPathResource("images/goat-report.png").getInputStream()) {
             JasperReport loadedReport = (JasperReport) JRLoader.loadObject(reportStream);
             JasperReport loadedInvoiceReport = (JasperReport) JRLoader.loadObject(invoiceStream);
+            JasperReport loadedRevenueReport = (JasperReport) JRLoader.loadObject(revenueStream);
             byte[] loadedLogo = logoStream.readAllBytes();
 
             warmUpOwnerBookingExporters(loadedReport, loadedLogo);
 
             ownerBookingReport = loadedReport;
             ownerBookingInvoiceReport = loadedInvoiceReport;
+            ownerRevenueReport = loadedRevenueReport;
             ownerBookingLogo = loadedLogo;
             log.info("Owner booking report engine initialized in {} ms", elapsedMillis(startedAt));
         } catch (IOException | JRException exception) {
@@ -234,6 +245,71 @@ public class ReportAdapter implements ReportPort {
                     reportBytes.length
             );
             return reportBytes;
+        }
+    }
+
+    @Override
+    public byte[] exportOwnerRevenue(String format, OwnerRevenueReportFilter filter)
+            throws ServiceException, JRException, IOException {
+        validateOwnerRevenueExport(format, filter);
+        long startedAt = System.nanoTime();
+        BaseResponse<VenueOwnerRevenueResponse> response = venueClient.getOwnerRevenue(
+                filter.venueId(), filter.fromDate(), filter.toDate()
+        );
+        VenueOwnerRevenueResponse revenue = response == null ? null : response.getData();
+        if (revenue == null || revenue.getCurrentPeriod() == null || revenue.getPreviousPeriod() == null) {
+            throw new ServiceException("Dịch vụ quản lý sân không trả dữ liệu doanh thu để xuất báo cáo.");
+        }
+        List<VenueOwnerDailyRevenueResponse> dailyRevenue = revenue.getDailyRevenue() == null
+                ? Collections.emptyList()
+                : revenue.getDailyRevenue();
+        double totalRevenue = moneyValue(revenue.getCurrentPeriod().getTotalRevenue());
+        List<OwnerRevenueReportRow> rows = new ArrayList<>(dailyRevenue.size());
+        for (int index = 0; index < dailyRevenue.size(); index++) {
+            VenueOwnerDailyRevenueResponse day = dailyRevenue.get(index);
+            double dayRevenue = moneyValue(day.getRevenue());
+            rows.add(OwnerRevenueReportRow.builder()
+                    .sequence(index + 1)
+                    .reportDate(day.getDate() == null ? "—" : DATE_FORMAT.format(day.getDate()))
+                    .revenue(dayRevenue)
+                    .succeededPaymentCount(day.getSucceededPaymentCount() == null ? 0L : day.getSucceededPaymentCount())
+                    .revenueShare(totalRevenue <= 0D ? 0D : dayRevenue * 100D / totalRevenue)
+                    .build());
+        }
+        Map<String, Object> parameters = new HashMap<>();
+        parameters.put("REPORT_DATE", getDateTimeFormat());
+        parameters.put("PERIOD_LABEL", valueOrDash(filter.periodLabel()));
+        parameters.put("VENUE_NAME", valueOrDash(filter.venueName()));
+        parameters.put("DATE_RANGE", DATE_FORMAT.format(filter.fromDate()) + " - " + DATE_FORMAT.format(filter.toDate()));
+        parameters.put("CURRENT_REVENUE", totalRevenue);
+        parameters.put("PREVIOUS_REVENUE", moneyValue(revenue.getPreviousPeriod().getTotalRevenue()));
+        parameters.put("REVENUE_CHANGE", moneyValue(revenue.getRevenueChangePercentage()));
+        parameters.put("BOOKING_COUNT", revenue.getCurrentPeriod().getBookingCount() == null ? 0L : revenue.getCurrentPeriod().getBookingCount());
+        parameters.put("PAID_BOOKING_COUNT", revenue.getCurrentPeriod().getPaidBookingCount() == null ? 0L : revenue.getCurrentPeriod().getPaidBookingCount());
+        parameters.put("AVERAGE_REVENUE", revenue.getCurrentPeriod().getPaidBookingCount() == null
+                || revenue.getCurrentPeriod().getPaidBookingCount() == 0L
+                ? 0D : totalRevenue / revenue.getCurrentPeriod().getPaidBookingCount());
+        parameters.put("STATUS_SUMMARY", revenueStatusSummary(revenue));
+        parameters.put(JRParameter.REPORT_LOCALE, Locale.forLanguageTag("vi-VN"));
+
+        try (InputStream logoStream = new ByteArrayInputStream(ownerBookingLogo);
+             ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
+            parameters.put("LOGO", logoStream);
+            JasperPrint jasperPrint = JasperFillManager.fillReport(
+                    ownerRevenueReport,
+                    parameters,
+                    new JRBeanCollectionDataSource(rows)
+            );
+            if (FormatType.PDF.getValue().equalsIgnoreCase(format)) {
+                JasperExportManager.exportReportToPdfStream(jasperPrint, outputStream);
+            } else {
+                JRXlsxExporter exporter = getJrXlsxExporter(jasperPrint, outputStream);
+                exporter.exportReport();
+            }
+            byte[] bytes = outputStream.toByteArray();
+            log.info("Owner revenue report generated: format={}, rows={}, total={} ms, bytes={}",
+                    format.toUpperCase(Locale.ROOT), rows.size(), elapsedMillis(startedAt), bytes.length);
+            return bytes;
         }
     }
 
@@ -584,6 +660,36 @@ public class ReportAdapter implements ReportPort {
         return values.isEmpty() ? "Phạm vi: Tất cả đơn đặt sân" : String.join("  |  ", values);
     }
 
+    private String revenueStatusSummary(VenueOwnerRevenueResponse revenue) {
+        if (revenue.getPaymentStatusBreakdown() == null || revenue.getPaymentStatusBreakdown().isEmpty()) {
+            return "Chưa có giao dịch thanh toán trong kỳ";
+        }
+        return revenue.getPaymentStatusBreakdown().stream()
+                .map(row -> paymentStatusLabel(row.getStatus()) + ": "
+                        + (row.getPaymentCount() == null ? 0L : row.getPaymentCount()) + " giao dịch · "
+                        + formatMoney(moneyValue(row.getNominalAmount())))
+                .collect(java.util.stream.Collectors.joining("  |  "));
+    }
+
+    private String paymentStatusLabel(String status) {
+        if (status == null) return "Không xác định";
+        return switch (status) {
+            case "CREATED" -> "Đã tạo";
+            case "PENDING" -> "Đang xử lý";
+            case "SUCCEEDED" -> "Thành công";
+            case "FAILED" -> "Thất bại";
+            case "CANCELLED" -> "Đã hủy";
+            case "EXPIRED" -> "Hết hạn";
+            case "PARTIALLY_REFUNDED" -> "Hoàn một phần";
+            case "REFUNDED" -> "Đã hoàn";
+            default -> status;
+        };
+    }
+
+    private double moneyValue(BigDecimal value) {
+        return value == null ? 0D : value.doubleValue();
+    }
+
     private void validateOwnerBookingExport(String format, OwnerBookingReportFilter filter) throws ServiceException {
         if (!FormatType.XLSX.getValue().equalsIgnoreCase(format)
                 && !FormatType.PDF.getValue().equalsIgnoreCase(format)) {
@@ -597,6 +703,22 @@ public class ReportAdapter implements ReportPort {
         if (paymentStatus != null && !Set.of("PAID", "UNPAID", "FAILED")
                 .contains(paymentStatus.toUpperCase(Locale.ROOT))) {
             throw new ServiceException("Trạng thái thanh toán không hợp lệ.");
+        }
+    }
+
+    private void validateOwnerRevenueExport(String format, OwnerRevenueReportFilter filter) throws ServiceException {
+        if (!FormatType.XLSX.getValue().equalsIgnoreCase(format)
+                && !FormatType.PDF.getValue().equalsIgnoreCase(format)) {
+            throw new ServiceException("Báo cáo doanh thu chỉ hỗ trợ định dạng PDF hoặc XLSX.");
+        }
+        if (filter == null || filter.fromDate() == null || filter.toDate() == null) {
+            throw new ServiceException("Khoảng ngày báo cáo doanh thu là bắt buộc.");
+        }
+        if (filter.fromDate().isAfter(filter.toDate())) {
+            throw new ServiceException("Khoảng ngày báo cáo doanh thu không hợp lệ.");
+        }
+        if (java.time.temporal.ChronoUnit.DAYS.between(filter.fromDate(), filter.toDate()) >= 366) {
+            throw new ServiceException("Khoảng ngày báo cáo doanh thu không được vượt quá 366 ngày.");
         }
     }
 

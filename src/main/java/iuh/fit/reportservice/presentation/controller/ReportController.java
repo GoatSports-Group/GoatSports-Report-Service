@@ -1,6 +1,7 @@
 package iuh.fit.reportservice.presentation.controller;
 
 import iuh.fit.reportservice.application.dto.report.OwnerBookingReportFilter;
+import iuh.fit.reportservice.application.dto.report.OwnerRevenueReportFilter;
 import iuh.fit.reportservice.application.port.report.ReportPort;
 import iuh.fit.reportservice.application.enums.FormatType;
 import iuh.fit.shared.annotation.AuditLog;
@@ -88,6 +89,47 @@ public class ReportController {
         headers.setContentType(MediaType.APPLICATION_PDF);
         headers.setContentDisposition(ContentDisposition.inline()
                 .filename("bao-cao-don-dat-san.pdf")
+                .build());
+        return ResponseEntity.ok()
+                .headers(headers)
+                .header(HttpHeaders.CACHE_CONTROL, "no-store")
+                .body(data);
+    }
+
+    @GetMapping("/export/owner-revenue")
+    @PreAuthorize("hasAuthority('GET_OWN_REVENUE')")
+    @AuditLog(action = "EXPORT_OWN_REVENUE", description = "Xuất báo cáo doanh thu của chủ sân")
+    public ResponseEntity<byte[]> exportOwnerRevenue(
+            @RequestParam(defaultValue = "xlsx") String format,
+            @RequestParam(required = false) UUID venueId,
+            @RequestParam(required = false) String venueName,
+            @RequestParam LocalDate fromDate,
+            @RequestParam LocalDate toDate,
+            @RequestParam(required = false) String periodLabel
+    ) throws Exception {
+        byte[] data = reportPort.exportOwnerRevenue(format, new OwnerRevenueReportFilter(
+                venueId, venueName, fromDate, toDate, periodLabel
+        ));
+        return getResponseEntity(format, "bao-cao-doanh-thu." + format.toLowerCase(), data);
+    }
+
+    @GetMapping("/preview/owner-revenue")
+    @PreAuthorize("hasAuthority('GET_OWN_REVENUE')")
+    @AuditLog(action = "PREVIEW_OWN_REVENUE", description = "Xem trước báo cáo doanh thu của chủ sân")
+    public ResponseEntity<byte[]> previewOwnerRevenue(
+            @RequestParam(required = false) UUID venueId,
+            @RequestParam(required = false) String venueName,
+            @RequestParam LocalDate fromDate,
+            @RequestParam LocalDate toDate,
+            @RequestParam(required = false) String periodLabel
+    ) throws Exception {
+        byte[] data = reportPort.exportOwnerRevenue("pdf", new OwnerRevenueReportFilter(
+                venueId, venueName, fromDate, toDate, periodLabel
+        ));
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_PDF);
+        headers.setContentDisposition(ContentDisposition.inline()
+                .filename("bao-cao-doanh-thu.pdf")
                 .build());
         return ResponseEntity.ok()
                 .headers(headers)

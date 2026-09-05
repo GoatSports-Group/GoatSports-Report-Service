@@ -1,6 +1,7 @@
 package iuh.fit.reportservice.application.port.report;
 
 import iuh.fit.reportservice.application.dto.report.OwnerBookingReportFilter;
+import iuh.fit.reportservice.application.dto.report.OwnerRevenueReportFilter;
 import iuh.fit.reportservice.application.exception.ServiceException;
 import net.sf.jasperreports.engine.JRException;
 
@@ -17,5 +18,8 @@ public interface ReportPort {
             throws ServiceException, JRException, IOException;
 
     byte[] exportOwnerBookingInvoice(UUID bookingId)
+            throws ServiceException, JRException, IOException;
+
+    byte[] exportOwnerRevenue(String format, OwnerRevenueReportFilter filter)
             throws ServiceException, JRException, IOException;
 }

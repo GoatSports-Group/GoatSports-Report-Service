@@ -3,6 +3,7 @@ package iuh.fit.reportservice.infrastructure.external.client;
 import iuh.fit.reportservice.application.dto.response.base.BaseResponse;
 import iuh.fit.reportservice.application.dto.venue.VenueOwnerBookingPageResponse;
 import iuh.fit.reportservice.application.dto.venue.VenueOwnerBookingResponse;
+import iuh.fit.reportservice.application.dto.venue.VenueOwnerRevenueResponse;
 import iuh.fit.reportservice.infrastructure.config.VenueClientConfig;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -34,5 +35,12 @@ public interface VenueClient {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate,
             @RequestParam int page,
             @RequestParam int size
+    );
+
+    @GetMapping("/api/v1/owner/revenue")
+    BaseResponse<VenueOwnerRevenueResponse> getOwnerRevenue(
+            @RequestParam(required = false) UUID venueId,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate
     );
 }
