@@ -49,6 +49,7 @@ import java.text.SimpleDateFormat;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -163,7 +164,7 @@ public class ReportAdapter implements ReportPort {
     public byte[] exportOwnerBookings(String format, OwnerBookingReportFilter filter)
             throws ServiceException, JRException, IOException {
         long startedAt = System.nanoTime();
-        validateOwnerBookingExport(format, filter);
+        OwnerBookingReportFilter.validate(filter, format);
 
         List<VenueOwnerBookingResponse> bookings = loadAllOwnerBookings(filter);
         long dataLoadedAt = System.nanoTime();
@@ -251,7 +252,7 @@ public class ReportAdapter implements ReportPort {
     @Override
     public byte[] exportOwnerRevenue(String format, OwnerRevenueReportFilter filter)
             throws ServiceException, JRException, IOException {
-        validateOwnerRevenueExport(format, filter);
+        OwnerRevenueReportFilter.validate(filter, format);
         long startedAt = System.nanoTime();
         BaseResponse<VenueOwnerRevenueResponse> response = venueClient.getOwnerRevenue(
                 filter.venueId(), filter.fromDate(), filter.toDate()
@@ -419,7 +420,7 @@ public class ReportAdapter implements ReportPort {
         Set<UUID> succeededIds = succeeded.stream()
                 .map(VenueOwnerPaymentResponse::getPaymentId)
                 .filter(Objects::nonNull)
-                .collect(java.util.stream.Collectors.toSet());
+                .collect(Collectors.toSet());
         if (booking.getDepositPaymentId() != null && !succeededIds.contains(booking.getDepositPaymentId())) {
             paid += nonNegative(booking.getDepositAmount());
         }
@@ -668,7 +669,7 @@ public class ReportAdapter implements ReportPort {
                 .map(row -> paymentStatusLabel(row.getStatus()) + ": "
                         + (row.getPaymentCount() == null ? 0L : row.getPaymentCount()) + " giao dịch · "
                         + formatMoney(moneyValue(row.getNominalAmount())))
-                .collect(java.util.stream.Collectors.joining("  |  "));
+                .collect(Collectors.joining("  |  "));
     }
 
     private String paymentStatusLabel(String status) {
@@ -688,38 +689,6 @@ public class ReportAdapter implements ReportPort {
 
     private double moneyValue(BigDecimal value) {
         return value == null ? 0D : value.doubleValue();
-    }
-
-    private void validateOwnerBookingExport(String format, OwnerBookingReportFilter filter) throws ServiceException {
-        if (!FormatType.XLSX.getValue().equalsIgnoreCase(format)
-                && !FormatType.PDF.getValue().equalsIgnoreCase(format)) {
-            throw new ServiceException("Báo cáo đơn đặt sân chỉ hỗ trợ định dạng PDF hoặc XLSX.");
-        }
-        if (filter == null) throw new ServiceException("Bộ lọc báo cáo đơn đặt sân là bắt buộc.");
-        if (filter.fromDate() != null && filter.toDate() != null && filter.fromDate().isAfter(filter.toDate())) {
-            throw new ServiceException("Khoảng ngày đặt sân không hợp lệ.");
-        }
-        String paymentStatus = blankToNull(filter.paymentStatus());
-        if (paymentStatus != null && !Set.of("PAID", "UNPAID", "FAILED")
-                .contains(paymentStatus.toUpperCase(Locale.ROOT))) {
-            throw new ServiceException("Trạng thái thanh toán không hợp lệ.");
-        }
-    }
-
-    private void validateOwnerRevenueExport(String format, OwnerRevenueReportFilter filter) throws ServiceException {
-        if (!FormatType.XLSX.getValue().equalsIgnoreCase(format)
-                && !FormatType.PDF.getValue().equalsIgnoreCase(format)) {
-            throw new ServiceException("Báo cáo doanh thu chỉ hỗ trợ định dạng PDF hoặc XLSX.");
-        }
-        if (filter == null || filter.fromDate() == null || filter.toDate() == null) {
-            throw new ServiceException("Khoảng ngày báo cáo doanh thu là bắt buộc.");
-        }
-        if (filter.fromDate().isAfter(filter.toDate())) {
-            throw new ServiceException("Khoảng ngày báo cáo doanh thu không hợp lệ.");
-        }
-        if (java.time.temporal.ChronoUnit.DAYS.between(filter.fromDate(), filter.toDate()) >= 366) {
-            throw new ServiceException("Khoảng ngày báo cáo doanh thu không được vượt quá 366 ngày.");
-        }
     }
 
     private String valueOrDash(String value) {
