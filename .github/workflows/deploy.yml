@@ -21,6 +21,9 @@ jobs:
       - name: Build Shared Kernel
         run: mvn -f shared-kernel/pom.xml clean install -DskipTests
 
+      - name: Run tests
+        run: mvn -B test
+
       - name: Build & Push Docker Image with Jib
         run: |
           mvn clean compile jib:build \
