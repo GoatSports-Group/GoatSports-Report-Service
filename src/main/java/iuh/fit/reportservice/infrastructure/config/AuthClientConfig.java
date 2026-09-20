@@ -4,9 +4,6 @@ import feign.RequestInterceptor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 
-/**
- * Gắn service identity cho lời gọi tới auth-service `/internal/**`.
- */
 public class AuthClientConfig {
     @Bean
     RequestInterceptor authServiceSecurityInterceptor(
