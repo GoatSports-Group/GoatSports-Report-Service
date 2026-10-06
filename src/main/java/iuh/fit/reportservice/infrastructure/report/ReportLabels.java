@@ -27,6 +27,7 @@ final class ReportLabels {
             case "REFUND_PENDING" -> "Chờ hoàn tiền";
             case "REFUNDED" -> "Đã hoàn tiền";
             case "EXPIRED" -> "Hết hạn";
+            case "NO_SHOW" -> "Không đến nhận sân";
             default -> status;
         };
     }
