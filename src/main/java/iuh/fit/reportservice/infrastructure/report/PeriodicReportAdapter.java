@@ -42,6 +42,7 @@ public class PeriodicReportAdapter implements PeriodicReportPort {
     private static final List<ReportPeriodType> SCHEDULED_TYPES = List.of(
             ReportPeriodType.WEEKLY, ReportPeriodType.MONTHLY, ReportPeriodType.QUARTERLY, ReportPeriodType.YEARLY);
     private static final DateTimeFormatter DAY = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+    private static final String CSV = "csv";
 
     private final JpaPeriodicReportRepository repository;
     private final VenueClient venueClient;
@@ -107,9 +108,56 @@ public class PeriodicReportAdapter implements PeriodicReportPort {
                 .orElseThrow(() -> new ServiceException("Không tìm thấy báo cáo."));
         VenueOwnerRevenueResponse revenue = objectMapper.readValue(entity.getSnapshot(), VenueOwnerRevenueResponse.class);
         ReportPeriodType type = ReportPeriodType.valueOf(entity.getPeriodType());
+        String label = periodLabel(type, entity.getPeriodStart(), entity.getPeriodEnd());
+        if (CSV.equalsIgnoreCase(format)) return toCsv(label, entity, revenue);
         return reportAdapter.renderOwnerRevenue(format, new OwnerRevenueReportFilter(
-                null, "Tất cả cơ sở", entity.getPeriodStart(), entity.getPeriodEnd(),
-                periodLabel(type, entity.getPeriodStart(), entity.getPeriodEnd())), revenue);
+                null, "Tất cả cơ sở", entity.getPeriodStart(), entity.getPeriodEnd(), label), revenue);
+    }
+
+    /**
+     * CSV tu snapshot da chot (khong qua Jasper): khoi tong quan, doanh thu theo ngay, doi soat thanh toan.
+     * So de dang thuan (khong dau ngan cach) de bang tinh doc duoc; co BOM UTF-8 de Excel hien dung tieng Viet.
+     */
+    static byte[] toCsv(String periodLabel, PeriodicReportEntity entity, VenueOwnerRevenueResponse revenue) {
+        StringBuilder csv = new StringBuilder("\uFEFF");
+        VenueOwnerRevenuePeriodResponse current = revenue.getCurrentPeriod();
+        VenueOwnerRevenuePeriodResponse previous = revenue.getPreviousPeriod();
+        row(csv, "Báo cáo doanh thu định kỳ", periodLabel);
+        row(csv, "Phạm vi", "Tất cả cơ sở");
+        row(csv, "Từ ngày", entity.getPeriodStart().format(DAY));
+        row(csv, "Đến ngày", entity.getPeriodEnd().format(DAY));
+        row(csv, "Doanh thu (VND)", number(current == null ? null : current.getTotalRevenue()));
+        row(csv, "Tổng lượt đặt", number(current == null ? null : current.getBookingCount()));
+        row(csv, "Lượt đã thanh toán", number(current == null ? null : current.getPaidBookingCount()));
+        row(csv, "Doanh thu kỳ trước (VND)", number(previous == null ? null : previous.getTotalRevenue()));
+        row(csv, "Thay đổi doanh thu so với kỳ trước (%)", number(revenue.getRevenueChangePercentage()));
+        row(csv, "Thay đổi lượt đặt so với kỳ trước (%)", number(revenue.getBookingCountChangePercentage()));
+        csv.append("\r\n");
+        row(csv, "Ngày", "Doanh thu (VND)", "Giao dịch thành công");
+        for (var day : revenue.getDailyRevenue()) {
+            row(csv, day.getDate() == null ? "" : day.getDate().format(DAY), number(day.getRevenue()), number(day.getSucceededPaymentCount()));
+        }
+        csv.append("\r\n");
+        row(csv, "Trạng thái thanh toán", "Số giao dịch", "Giá trị (VND)");
+        for (var status : revenue.getPaymentStatusBreakdown()) {
+            row(csv, ReportLabels.paymentStatus(status.getStatus()), number(status.getPaymentCount()), number(status.getNominalAmount()));
+        }
+        return csv.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8);
+    }
+
+    private static void row(StringBuilder csv, String... cells) {
+        for (int index = 0; index < cells.length; index++) {
+            if (index > 0) csv.append(',');
+            String cell = cells[index] == null ? "" : cells[index];
+            boolean quote = cell.contains(",") || cell.contains("\"") || cell.contains("\n") || cell.contains("\r");
+            csv.append(quote ? '"' + cell.replace("\"", "\"\"") + '"' : cell);
+        }
+        csv.append("\r\n");
+    }
+
+    private static String number(Number value) {
+        if (value == null) return "";
+        return value instanceof BigDecimal decimal ? decimal.stripTrailingZeros().toPlainString() : value.toString();
     }
 
     @Scheduled(cron = "0 30 1 * * *", zone = "Asia/Ho_Chi_Minh")

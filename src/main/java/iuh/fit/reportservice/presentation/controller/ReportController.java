@@ -232,6 +232,9 @@ public class ReportController {
         } else if (format.equalsIgnoreCase(FormatType.XLSX.getValue())) {
             headers.setContentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"));
             headers.setContentDispositionFormData("attachment", filename);
+        } else if (format.equalsIgnoreCase(FormatType.CSV.getValue())) {
+            headers.setContentType(MediaType.parseMediaType("text/csv; charset=UTF-8"));
+            headers.setContentDispositionFormData("attachment", filename);
         }
 
         return ResponseEntity.ok()

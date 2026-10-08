@@ -110,4 +110,36 @@ class PeriodicReportAdapterTest {
         response.setRevenueChangePercentage(new BigDecimal("12.50"));
         return new BaseResponse<>(200, response, null, null);
     }
+
+    @Test
+    void csvExportReadsTheStoredSnapshotWithoutJasper() throws Exception {
+        VenueOwnerRevenueResponse snapshot = revenue(new BigDecimal("1250000")).getData();
+        var day = new iuh.fit.reportservice.application.dto.venue.VenueOwnerDailyRevenueResponse();
+        day.setDate(LocalDate.of(2026, 9, 2));
+        day.setRevenue(new BigDecimal("60000.00"));
+        day.setSucceededPaymentCount(1L);
+        snapshot.getDailyRevenue().add(day);
+        var status = new iuh.fit.reportservice.application.dto.venue.VenueOwnerRevenueStatusResponse();
+        status.setStatus("SUCCEEDED");
+        status.setPaymentCount(3L);
+        status.setNominalAmount(new BigDecimal("1250000"));
+        snapshot.getPaymentStatusBreakdown().add(status);
+        PeriodicReportEntity entity = new PeriodicReportEntity();
+        entity.setReportId(UUID.randomUUID());
+        entity.setOwnerId(ownerId);
+        entity.setPeriodType("MONTHLY");
+        entity.setPeriodStart(from);
+        entity.setPeriodEnd(to);
+        entity.setSnapshot(JsonMapper.builder().build().writeValueAsString(snapshot));
+        when(repository.findById(entity.getReportId())).thenReturn(Optional.of(entity));
+
+        String csv = new String(adapter.export(ownerId, entity.getReportId(), "csv"), java.nio.charset.StandardCharsets.UTF_8);
+
+        // BOM cho Excel, so thuan khong dau ngan cach, nhan trang thai tieng Viet; khong goi Jasper.
+        assertThat(csv).startsWith("\uFEFFBáo cáo doanh thu định kỳ,Tháng 09/2026\r\n");
+        assertThat(csv).contains("Doanh thu (VND),1250000\r\n");
+        assertThat(csv).contains("02/09/2026,60000,1\r\n");
+        assertThat(csv).contains("Thành công,3,1250000\r\n");
+        verify(reportAdapter, never()).renderOwnerRevenue(any(), any(), any());
+    }
 }
