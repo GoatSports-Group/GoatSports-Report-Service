@@ -5,7 +5,6 @@
         xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
                       http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-5.0.xsd">
 
-    <!-- Bao cao dinh ky cua chu san: so lieu chot ky + snapshot du lieu doanh thu de dung lai PDF/XLSX y het. -->
     <changeSet id="20261009-report-periodic-reports" author="minhdat">
         <createTable tableName="periodic_reports">
             <column name="report_id" type="UUID"><constraints primaryKey="true" nullable="false"/></column>
