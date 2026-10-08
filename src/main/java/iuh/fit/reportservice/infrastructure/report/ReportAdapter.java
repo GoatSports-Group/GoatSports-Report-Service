@@ -166,6 +166,18 @@ public class ReportAdapter implements ReportPort {
         if (revenue == null || revenue.getCurrentPeriod() == null || revenue.getPreviousPeriod() == null) {
             throw new ServiceException("Dịch vụ quản lý sân không trả dữ liệu doanh thu để xuất báo cáo.");
         }
+        return renderOwnerRevenue(format, filter, revenue, startedAt);
+    }
+
+    /** Dựng file từ dữ liệu doanh thu có sẵn (báo cáo định kỳ dùng bản snapshot đã chốt). */
+    public byte[] renderOwnerRevenue(String format, OwnerRevenueReportFilter filter, VenueOwnerRevenueResponse revenue)
+            throws ServiceException, JRException {
+        OwnerRevenueReportFilter.validate(filter, format);
+        return renderOwnerRevenue(format, filter, revenue, System.nanoTime());
+    }
+
+    private byte[] renderOwnerRevenue(String format, OwnerRevenueReportFilter filter, VenueOwnerRevenueResponse revenue,
+                                      long startedAt) throws JRException, ServiceException {
         List<OwnerRevenueReportRow> rows = OwnerRevenueReportMapper.toRows(revenue);
         Map<String, Object> parameters = OwnerRevenueReportMapper.parameters(filter, revenue);
         parameters.put("LOGO", JasperRenderer.stream(logo));

@@ -2,8 +2,13 @@ package iuh.fit.reportservice.presentation.controller;
 
 import iuh.fit.reportservice.application.dto.report.OwnerBookingReportFilter;
 import iuh.fit.reportservice.application.dto.report.OwnerRevenueReportFilter;
+import iuh.fit.reportservice.application.dto.report.PeriodicReportView;
+import iuh.fit.reportservice.application.exception.ServiceException;
+import iuh.fit.reportservice.application.port.report.PeriodicReportPort;
 import iuh.fit.reportservice.application.port.report.ReportPort;
+import iuh.fit.reportservice.application.port.security.CurrentUserProvider;
 import iuh.fit.reportservice.application.enums.FormatType;
+import iuh.fit.reportservice.application.enums.ReportPeriodType;
 import iuh.fit.shared.annotation.AuditLog;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ContentDisposition;
@@ -14,6 +19,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -21,6 +27,8 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class ReportController {
     private final ReportPort reportPort;
+    private final PeriodicReportPort periodicReportPort;
+    private final CurrentUserProvider currentUserProvider;
 
     @GetMapping("/export/users")
     @PreAuthorize("hasAuthority('EXPORT_USERS')")
@@ -135,6 +143,42 @@ public class ReportController {
                 .headers(headers)
                 .header(HttpHeaders.CACHE_CONTROL, "no-store")
                 .body(data);
+    }
+
+    @GetMapping("/owner/periodic")
+    @PreAuthorize("hasAuthority('GET_OWN_REVENUE')")
+    public List<PeriodicReportView> listPeriodicReports(
+            @RequestParam(required = false) ReportPeriodType periodType
+    ) throws ServiceException {
+        return periodicReportPort.list(currentOwnerId(), periodType);
+    }
+
+    /** Chủ sân tự chốt kỳ vừa kết thúc (không cần đợi job đêm) hoặc khoảng ngày tùy chọn (CUSTOM). */
+    @PostMapping("/owner/periodic")
+    @PreAuthorize("hasAuthority('GET_OWN_REVENUE')")
+    @AuditLog(action = "GENERATE_OWN_PERIODIC_REPORT", description = "Chốt báo cáo định kỳ của chủ sân")
+    public PeriodicReportView generatePeriodicReport(
+            @RequestParam ReportPeriodType periodType,
+            @RequestParam(required = false) LocalDate fromDate,
+            @RequestParam(required = false) LocalDate toDate
+    ) throws ServiceException {
+        return periodicReportPort.generate(currentOwnerId(), periodType, fromDate, toDate);
+    }
+
+    @GetMapping("/owner/periodic/{reportId}/export")
+    @PreAuthorize("hasAuthority('GET_OWN_REVENUE')")
+    @AuditLog(action = "EXPORT_OWN_PERIODIC_REPORT", description = "Tải báo cáo định kỳ #{#reportId}")
+    public ResponseEntity<byte[]> exportPeriodicReport(
+            @PathVariable UUID reportId,
+            @RequestParam(defaultValue = "pdf") String format
+    ) throws Exception {
+        byte[] data = periodicReportPort.export(currentOwnerId(), reportId, format);
+        return getResponseEntity(format, "bao-cao-dinh-ky." + format.toLowerCase(), data);
+    }
+
+    private UUID currentOwnerId() throws ServiceException {
+        return UUID.fromString(currentUserProvider.getCurrentUserId()
+                .orElseThrow(() -> new ServiceException("Bạn phải đăng nhập để xem báo cáo.")));
     }
 
     @GetMapping("/export/owner-bookings/{bookingId}/invoice")

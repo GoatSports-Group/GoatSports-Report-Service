@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
 
 import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
 
 @FeignClient(
@@ -35,6 +36,18 @@ public interface VenueClient {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate,
             @RequestParam int page,
             @RequestParam int size
+    );
+
+    /** Nội bộ (job báo cáo định kỳ, không có người dùng đăng nhập): chủ của ít nhất một cơ sở. */
+    @GetMapping("/internal/owner-revenue/owners")
+    BaseResponse<List<UUID>> getRevenueOwnerIds();
+
+    /** Nội bộ: doanh thu mọi cơ sở của {@code ownerId}. */
+    @GetMapping("/internal/owner-revenue")
+    BaseResponse<VenueOwnerRevenueResponse> getOwnerRevenueForOwner(
+            @RequestParam UUID ownerId,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate
     );
 
     @GetMapping("/api/v1/owner/revenue")
