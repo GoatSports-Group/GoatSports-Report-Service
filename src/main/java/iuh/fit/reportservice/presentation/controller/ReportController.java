@@ -84,13 +84,15 @@ public class ReportController {
     @AuditLog(action = "EXPORT_ALL_BOOKINGS", description = "Xuất báo cáo đơn đặt sân toàn nền tảng")
     public ResponseEntity<byte[]> exportAdminBookings(
             @RequestParam(defaultValue = "xlsx") String format,
+            @RequestParam(required = false) UUID venueId,
+            @RequestParam(required = false) UUID venueCourtId,
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String query,
             @RequestParam(required = false) LocalDate fromDate,
             @RequestParam(required = false) LocalDate toDate
     ) throws Exception {
         byte[] data = reportPort.exportAdminBookings(format, ownerBookingFilter(
-                null, null, status, null, query, fromDate, toDate));
+                venueId, venueCourtId, status, null, query, fromDate, toDate));
         return getResponseEntity(format, "bao-cao-don-dat-san-nen-tang." + format.toLowerCase(), data);
     }
 
@@ -98,13 +100,15 @@ public class ReportController {
     @PreAuthorize("hasAuthority('EXPORT_ALL_BOOKINGS')")
     @AuditLog(action = "PREVIEW_ALL_BOOKINGS", description = "Xem trước báo cáo đơn đặt sân toàn nền tảng")
     public ResponseEntity<byte[]> previewAdminBookings(
+            @RequestParam(required = false) UUID venueId,
+            @RequestParam(required = false) UUID venueCourtId,
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String query,
             @RequestParam(required = false) LocalDate fromDate,
             @RequestParam(required = false) LocalDate toDate
     ) throws Exception {
         byte[] data = reportPort.exportAdminBookings("pdf", ownerBookingFilter(
-                null, null, status, null, query, fromDate, toDate));
+                venueId, venueCourtId, status, null, query, fromDate, toDate));
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_PDF);
         headers.setContentDisposition(ContentDisposition.inline()

@@ -46,8 +46,8 @@ import java.util.UUID;
 @Slf4j
 public class ReportAdapter implements ReportPort {
     private static final int BOOKING_PAGE_SIZE = 20;
-    /** API admin của venue-service nhận trang tới 200 dòng: ít lượt gọi hơn nhiều khi xuất toàn nền tảng. */
-    private static final int ADMIN_BOOKING_PAGE_SIZE = 200;
+    /** API admin của venue-service nhận trang tới 100 dòng (giới hạn 100 reference ID của payment-service). */
+    private static final int ADMIN_BOOKING_PAGE_SIZE = 100;
     /** Chặn báo cáo quá lớn: Jasper giữ toàn bộ trang trong bộ nhớ, vài chục nghìn dòng có thể làm tràn heap. */
     private static final int MAX_BOOKING_EXPORT_ROWS = 10_000;
 
@@ -212,7 +212,8 @@ public class ReportAdapter implements ReportPort {
             String status = ReportLabels.blankToNull(filter.status());
             String query = ReportLabels.blankToNull(filter.query());
             BaseResponse<VenueOwnerBookingPageResponse> response = platformWide
-                    ? venueClient.getAdminBookings(status, query, filter.fromDate(), filter.toDate(), page, ADMIN_BOOKING_PAGE_SIZE)
+                    ? venueClient.getAdminBookings(filter.venueId(), filter.venueCourtId(), status, query, filter.fromDate(),
+                    filter.toDate(), page, ADMIN_BOOKING_PAGE_SIZE)
                     : venueClient.getOwnerBookings(filter.venueId(), filter.venueCourtId(), status, query,
                     filter.fromDate(), filter.toDate(), page, BOOKING_PAGE_SIZE);
             VenueOwnerBookingPageResponse data = response == null ? null : response.getData();

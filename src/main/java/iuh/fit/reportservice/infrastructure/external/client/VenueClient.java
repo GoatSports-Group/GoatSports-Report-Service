@@ -40,6 +40,8 @@ public interface VenueClient {
 
     @GetMapping("/api/v1/admin/bookings")
     BaseResponse<VenueOwnerBookingPageResponse> getAdminBookings(
+            @RequestParam(required = false) UUID venueId,
+            @RequestParam(required = false) UUID venueCourtId,
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String query,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
