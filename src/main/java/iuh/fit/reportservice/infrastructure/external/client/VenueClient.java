@@ -38,6 +38,16 @@ public interface VenueClient {
             @RequestParam int size
     );
 
+    @GetMapping("/api/v1/admin/bookings")
+    BaseResponse<VenueOwnerBookingPageResponse> getAdminBookings(
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String query,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate,
+            @RequestParam int page,
+            @RequestParam int size
+    );
+
     /** Nội bộ (job báo cáo định kỳ, không có người dùng đăng nhập): chủ của ít nhất một cơ sở. */
     @GetMapping("/internal/owner-revenue/owners")
     BaseResponse<List<UUID>> getRevenueOwnerIds();

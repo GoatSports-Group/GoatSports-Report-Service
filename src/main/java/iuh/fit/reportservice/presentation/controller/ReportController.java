@@ -79,6 +79,21 @@ public class ReportController {
         return getResponseEntity(format, "bao-cao-don-dat-san." + format.toLowerCase(), data);
     }
 
+    @GetMapping("/export/admin-bookings")
+    @PreAuthorize("hasAuthority('EXPORT_ALL_BOOKINGS')")
+    @AuditLog(action = "EXPORT_ALL_BOOKINGS", description = "Xuất báo cáo đơn đặt sân toàn nền tảng")
+    public ResponseEntity<byte[]> exportAdminBookings(
+            @RequestParam(defaultValue = "xlsx") String format,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String query,
+            @RequestParam(required = false) LocalDate fromDate,
+            @RequestParam(required = false) LocalDate toDate
+    ) throws Exception {
+        byte[] data = reportPort.exportAdminBookings(format, ownerBookingFilter(
+                null, null, status, null, query, fromDate, toDate));
+        return getResponseEntity(format, "bao-cao-don-dat-san-nen-tang." + format.toLowerCase(), data);
+    }
+
     @GetMapping("/preview/owner-bookings")
     @PreAuthorize("hasAuthority('GET_OWN_BOOKINGS')")
     @AuditLog(action = "PREVIEW_OWN_BOOKINGS", description = "Xem trước báo cáo đơn đặt sân của chủ sân")

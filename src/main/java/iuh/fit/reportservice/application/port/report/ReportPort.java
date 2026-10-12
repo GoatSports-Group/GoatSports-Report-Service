@@ -14,6 +14,9 @@ public interface ReportPort {
 
     byte[] exportUserDetail(String format, String userId) throws ServiceException, JRException, IOException;
 
+    byte[] exportAdminBookings(String format, OwnerBookingReportFilter filter)
+            throws ServiceException, JRException, IOException;
+
     byte[] exportOwnerBookings(String format, OwnerBookingReportFilter filter)
             throws ServiceException, JRException, IOException;
 

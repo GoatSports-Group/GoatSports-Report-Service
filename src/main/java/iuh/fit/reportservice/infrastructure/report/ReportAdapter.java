@@ -103,10 +103,21 @@ public class ReportAdapter implements ReportPort {
     @Override
     public byte[] exportOwnerBookings(String format, OwnerBookingReportFilter filter)
             throws ServiceException, JRException, IOException {
+        return exportBookings(format, filter, false);
+    }
+
+    @Override
+    public byte[] exportAdminBookings(String format, OwnerBookingReportFilter filter)
+            throws ServiceException, JRException, IOException {
+        return exportBookings(format, filter, true);
+    }
+
+    private byte[] exportBookings(String format, OwnerBookingReportFilter filter, boolean platformWide)
+            throws ServiceException, JRException, IOException {
         long startedAt = System.nanoTime();
         OwnerBookingReportFilter.validate(filter, format);
 
-        List<VenueOwnerBookingResponse> bookings = loadAllOwnerBookings(filter);
+        List<VenueOwnerBookingResponse> bookings = loadAllBookings(filter, platformWide);
         long dataLoadedAt = System.nanoTime();
         List<OwnerBookingReportRow> rows = OwnerBookingReportMapper.toRows(bookings, filter.paymentStatus());
         long rowsMappedAt = System.nanoTime();
@@ -120,8 +131,8 @@ public class ReportAdapter implements ReportPort {
         long reportFilledAt = System.nanoTime();
         byte[] bytes = renderer.export(print, format);
         long completedAt = System.nanoTime();
-        log.info("Owner booking report generated: format={}, rows={}, fetch={} ms, map={} ms, fill={} ms, export={} ms, total={} ms, bytes={}",
-                format.toUpperCase(Locale.ROOT), rows.size(),
+        log.info("Booking report generated: platformWide={}, format={}, rows={}, fetch={} ms, map={} ms, fill={} ms, export={} ms, total={} ms, bytes={}",
+                platformWide, format.toUpperCase(Locale.ROOT), rows.size(),
                 elapsedMillis(startedAt, dataLoadedAt), elapsedMillis(dataLoadedAt, rowsMappedAt),
                 elapsedMillis(rowsMappedAt, reportFilledAt), elapsedMillis(reportFilledAt, completedAt),
                 elapsedMillis(startedAt, completedAt), bytes.length);
@@ -190,14 +201,18 @@ public class ReportAdapter implements ReportPort {
     }
 
     /** venue-service phân trang cố định 20 dòng; đi hết các trang, dừng sớm nếu vượt giới hạn xuất. */
-    private List<VenueOwnerBookingResponse> loadAllOwnerBookings(OwnerBookingReportFilter filter) throws ServiceException {
+    private List<VenueOwnerBookingResponse> loadAllBookings(OwnerBookingReportFilter filter, boolean platformWide)
+            throws ServiceException {
         List<VenueOwnerBookingResponse> bookings = new ArrayList<>();
         int page = 0;
         int pages;
         do {
-            BaseResponse<VenueOwnerBookingPageResponse> response = venueClient.getOwnerBookings(
-                    filter.venueId(), filter.venueCourtId(), ReportLabels.blankToNull(filter.status()),
-                    ReportLabels.blankToNull(filter.query()), filter.fromDate(), filter.toDate(), page, BOOKING_PAGE_SIZE);
+            String status = ReportLabels.blankToNull(filter.status());
+            String query = ReportLabels.blankToNull(filter.query());
+            BaseResponse<VenueOwnerBookingPageResponse> response = platformWide
+                    ? venueClient.getAdminBookings(status, query, filter.fromDate(), filter.toDate(), page, BOOKING_PAGE_SIZE)
+                    : venueClient.getOwnerBookings(filter.venueId(), filter.venueCourtId(), status, query,
+                    filter.fromDate(), filter.toDate(), page, BOOKING_PAGE_SIZE);
             VenueOwnerBookingPageResponse data = response == null ? null : response.getData();
             if (data == null) throw new ServiceException("Dịch vụ quản lý sân không trả dữ liệu đơn đặt sân để xuất báo cáo.");
 
