@@ -46,9 +46,6 @@ import java.util.UUID;
 @Slf4j
 public class ReportAdapter implements ReportPort {
     private static final int BOOKING_PAGE_SIZE = 20;
-    /** API admin của venue-service nhận trang tới 100 dòng (giới hạn 100 reference ID của payment-service). */
-    private static final int ADMIN_BOOKING_PAGE_SIZE = 100;
-    /** Chặn báo cáo quá lớn: Jasper giữ toàn bộ trang trong bộ nhớ, vài chục nghìn dòng có thể làm tràn heap. */
     private static final int MAX_BOOKING_EXPORT_ROWS = 10_000;
 
     private final AuthClient authClient;
@@ -105,40 +102,32 @@ public class ReportAdapter implements ReportPort {
     @Override
     public byte[] exportOwnerBookings(String format, OwnerBookingReportFilter filter)
             throws ServiceException, JRException, IOException {
-        return exportBookings(format, filter, false);
-    }
-
-    @Override
-    public byte[] exportAdminBookings(String format, OwnerBookingReportFilter filter)
-            throws ServiceException, JRException, IOException {
-        return exportBookings(format, filter, true);
-    }
-
-    private byte[] exportBookings(String format, OwnerBookingReportFilter filter, boolean platformWide)
-            throws ServiceException, JRException, IOException {
         long startedAt = System.nanoTime();
         OwnerBookingReportFilter.validate(filter, format);
-
-        List<VenueOwnerBookingResponse> bookings = loadAllBookings(filter, platformWide);
+        List<VenueOwnerBookingResponse> bookings = loadAllOwnerBookings(filter);
         long dataLoadedAt = System.nanoTime();
-        List<OwnerBookingReportRow> rows = OwnerBookingReportMapper.toRows(bookings, filter.paymentStatus());
-        long rowsMappedAt = System.nanoTime();
+        byte[] bytes = renderBookingTable(format, OwnerBookingReportMapper.filterSummary(filter), filter.paymentStatus(), bookings);
+        log.info("Owner booking report generated: format={}, rows={}, fetch={} ms, render={} ms, bytes={}",
+                format.toUpperCase(Locale.ROOT), bookings.size(), elapsedMillis(startedAt, dataLoadedAt),
+                elapsedMillis(dataLoadedAt, System.nanoTime()), bytes.length);
+        return bytes;
+    }
+
+    /** Bảng đơn đặt sân (mẫu Jasper chung của chủ sân và admin) từ dữ liệu đã có sẵn. */
+    public byte[] renderBookingTable(String format, String filterSummary, String paymentStatus,
+                                     List<VenueOwnerBookingResponse> bookings) throws JRException, ServiceException {
+        List<OwnerBookingReportRow> rows = OwnerBookingReportMapper.toRows(bookings, paymentStatus);
         Map<String, Object> parameters = new HashMap<>();
         parameters.put("REPORT_DATE", ReportLabels.generatedAt());
-        parameters.put("FILTER_SUMMARY", OwnerBookingReportMapper.filterSummary(filter));
+        parameters.put("FILTER_SUMMARY", filterSummary);
         parameters.put("TOTAL_RECORDS", rows.size());
         parameters.put("LOGO", JasperRenderer.stream(logo));
-
         JasperPrint print = JasperFillManager.fillReport(ownerBookingReport, parameters, new JRBeanCollectionDataSource(rows));
-        long reportFilledAt = System.nanoTime();
-        byte[] bytes = renderer.export(print, format);
-        long completedAt = System.nanoTime();
-        log.info("Booking report generated: platformWide={}, format={}, rows={}, fetch={} ms, map={} ms, fill={} ms, export={} ms, total={} ms, bytes={}",
-                platformWide, format.toUpperCase(Locale.ROOT), rows.size(),
-                elapsedMillis(startedAt, dataLoadedAt), elapsedMillis(dataLoadedAt, rowsMappedAt),
-                elapsedMillis(rowsMappedAt, reportFilledAt), elapsedMillis(reportFilledAt, completedAt),
-                elapsedMillis(startedAt, completedAt), bytes.length);
-        return bytes;
+        return renderer.export(print, format);
+    }
+
+    byte[] logo() {
+        return logo;
     }
 
     @Override
@@ -203,19 +192,14 @@ public class ReportAdapter implements ReportPort {
     }
 
     /** venue-service phân trang cố định 20 dòng; đi hết các trang, dừng sớm nếu vượt giới hạn xuất. */
-    private List<VenueOwnerBookingResponse> loadAllBookings(OwnerBookingReportFilter filter, boolean platformWide)
-            throws ServiceException {
+    private List<VenueOwnerBookingResponse> loadAllOwnerBookings(OwnerBookingReportFilter filter) throws ServiceException {
         List<VenueOwnerBookingResponse> bookings = new ArrayList<>();
         int page = 0;
         int pages;
         do {
-            String status = ReportLabels.blankToNull(filter.status());
-            String query = ReportLabels.blankToNull(filter.query());
-            BaseResponse<VenueOwnerBookingPageResponse> response = platformWide
-                    ? venueClient.getAdminBookings(filter.venueId(), filter.venueCourtId(), status, query, filter.fromDate(),
-                    filter.toDate(), page, ADMIN_BOOKING_PAGE_SIZE)
-                    : venueClient.getOwnerBookings(filter.venueId(), filter.venueCourtId(), status, query,
-                    filter.fromDate(), filter.toDate(), page, BOOKING_PAGE_SIZE);
+            BaseResponse<VenueOwnerBookingPageResponse> response = venueClient.getOwnerBookings(
+                    filter.venueId(), filter.venueCourtId(), ReportLabels.blankToNull(filter.status()),
+                    ReportLabels.blankToNull(filter.query()), filter.fromDate(), filter.toDate(), page, BOOKING_PAGE_SIZE);
             VenueOwnerBookingPageResponse data = response == null ? null : response.getData();
             if (data == null) throw new ServiceException("Dịch vụ quản lý sân không trả dữ liệu đơn đặt sân để xuất báo cáo.");
 

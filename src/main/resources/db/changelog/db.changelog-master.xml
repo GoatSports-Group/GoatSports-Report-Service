@@ -27,4 +27,49 @@
             <column name="period_end"/>
         </createIndex>
     </changeSet>
+
+    <!-- Xuất báo cáo chạy nền: job + file (file tách bảng để danh sách không nạp bytea), giữ 7 ngày. -->
+    <changeSet id="20261012-report-exports" author="minhdat">
+        <createTable tableName="report_exports">
+            <column name="export_id" type="UUID"><constraints primaryKey="true" nullable="false"/></column>
+            <column name="report_type" type="VARCHAR(40)"><constraints nullable="false"/></column>
+            <column name="format" type="VARCHAR(10)"><constraints nullable="false"/></column>
+            <column name="requested_by" type="UUID"><constraints nullable="false"/></column>
+            <column name="filter_json" type="VARCHAR(2000)"><constraints nullable="false"/></column>
+            <column name="filter_key" type="VARCHAR(64)"><constraints nullable="false"/></column>
+            <column name="filter_summary" type="VARCHAR(500)"><constraints nullable="false"/></column>
+            <column name="status" type="VARCHAR(20)"><constraints nullable="false"/></column>
+            <column name="row_count" type="INTEGER"/>
+            <column name="file_name" type="VARCHAR(200)"/>
+            <column name="content_type" type="VARCHAR(120)"/>
+            <column name="file_size" type="BIGINT"/>
+            <column name="failure_reason" type="VARCHAR(500)"/>
+            <column name="attempts" type="INTEGER" defaultValueNumeric="0"><constraints nullable="false"/></column>
+            <column name="lease_until" type="TIMESTAMP WITH TIME ZONE"/>
+            <column name="created_at" type="TIMESTAMP WITH TIME ZONE"><constraints nullable="false"/></column>
+            <column name="started_at" type="TIMESTAMP WITH TIME ZONE"/>
+            <column name="completed_at" type="TIMESTAMP WITH TIME ZONE"/>
+            <column name="expires_at" type="TIMESTAMP WITH TIME ZONE"><constraints nullable="false"/></column>
+        </createTable>
+        <createIndex tableName="report_exports" indexName="idx_report_exports_requester_created">
+            <column name="requested_by"/>
+            <column name="created_at"/>
+        </createIndex>
+        <createIndex tableName="report_exports" indexName="idx_report_exports_status_lease">
+            <column name="status"/>
+            <column name="lease_until"/>
+        </createIndex>
+        <createIndex tableName="report_exports" indexName="idx_report_exports_expires">
+            <column name="expires_at"/>
+        </createIndex>
+
+        <createTable tableName="report_export_files">
+            <column name="export_id" type="UUID">
+                <constraints primaryKey="true" nullable="false"
+                             foreignKeyName="fk_report_export_files_export" references="report_exports(export_id)"
+                             deleteCascade="true"/>
+            </column>
+            <column name="data" type="BYTEA"><constraints nullable="false"/></column>
+        </createTable>
+    </changeSet>
 </databaseChangeLog>
