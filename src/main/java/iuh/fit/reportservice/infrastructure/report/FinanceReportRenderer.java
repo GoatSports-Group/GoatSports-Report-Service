@@ -11,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 import net.sf.jasperreports.engine.JRException;
 import net.sf.jasperreports.engine.JRParameter;
 import net.sf.jasperreports.engine.JasperFillManager;
+import net.sf.jasperreports.engine.JasperPrint;
 import net.sf.jasperreports.engine.JasperReport;
 import net.sf.jasperreports.engine.data.JRMapCollectionDataSource;
 import org.springframework.stereotype.Component;
@@ -72,20 +73,25 @@ public class FinanceReportRenderer {
             List<FinancePayoutResponse> payouts = data(paymentClient.exportPayouts(filter.payoutKind(), filter.statuses(),
                     filter.keyword(), filter.people(), filter.fromDate(), filter.toDate()));
             Map<UUID, UserDirectory.Person> people = users.find(payouts.stream().map(FinancePayoutResponse::payeeId).toList());
-            byte[] data = fill(payoutReport, payoutRows(payouts, people), format, filterSummary,
+            JasperPrint print = fill(payoutReport, payoutRows(payouts, people), filterSummary,
                     payouts.stream().mapToDouble(row -> value(row.amount())).sum());
-            return new RenderedExport(data, payouts.size(), "REFUND".equals(filter.payoutKind()) ? "chi-hoan-" : "chu-san-rut-tien-");
+            return output(print, format, payouts.size(), "REFUND".equals(filter.payoutKind()) ? "chi-hoan-" : "chu-san-rut-tien-");
         }
         List<FinanceRefundResponse> refunds = data(paymentClient.exportRefunds(filter.statuses(), filter.keyword(),
                 filter.people(), filter.olderThanDays(), filter.fromDate(), filter.toDate()));
         Map<UUID, UserDirectory.Person> people = users.find(refunds.stream().map(FinanceRefundResponse::payerId).toList());
-        byte[] data = fill(refundReport, refundRows(refunds, people), format, filterSummary,
+        JasperPrint print = fill(refundReport, refundRows(refunds, people), filterSummary,
                 refunds.stream().mapToDouble(row -> value(row.amount())).sum());
-        return new RenderedExport(data, refunds.size(), "hoan-tien-");
+        return output(print, format, refunds.size(), "hoan-tien-");
     }
 
-    private byte[] fill(JasperReport report, List<Map<String, Object>> rows, String format, String filterSummary, double total)
+    private RenderedExport output(JasperPrint print, String format, int rows, String filePrefix)
             throws JRException, ServiceException {
+        return new RenderedExport(renderer.export(print, format), rows, filePrefix);
+    }
+
+    private JasperPrint fill(JasperReport report, List<Map<String, Object>> rows, String filterSummary, double total)
+            throws JRException {
         Map<String, Object> parameters = new HashMap<>();
         parameters.put("REPORT_DATE", ReportLabels.generatedAt());
         parameters.put("FILTER_SUMMARY", filterSummary);
@@ -94,7 +100,7 @@ public class FinanceReportRenderer {
         parameters.put("LOGO", JasperRenderer.stream(logo));
         // Số tiền dạng 60.000 (mẫu "#,##0" theo locale báo cáo, mặc định của JVM là kiểu Anh 60,000).
         parameters.put(JRParameter.REPORT_LOCALE, VI);
-        return renderer.export(JasperFillManager.fillReport(report, parameters, new JRMapCollectionDataSource(List.<Map<String, ?>>copyOf(rows))), format);
+        return JasperFillManager.fillReport(report, parameters, new JRMapCollectionDataSource(List.<Map<String, ?>>copyOf(rows)));
     }
 
     static List<Map<String, Object>> refundRows(List<FinanceRefundResponse> refunds, Map<UUID, UserDirectory.Person> people) {
