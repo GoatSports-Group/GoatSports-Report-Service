@@ -10,6 +10,7 @@ import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
 import org.springframework.beans.factory.annotation.Value;
+import org.slf4j.MDC;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -39,6 +40,10 @@ public class AuditLogAspect {
 
     @Value("${spring.kafka.topic.user-log}")
     private String userLogTopic;
+
+    /** GOATSPORTS-AUTH-SERVICE -> auth-service, cùng tên với trang Giám sát. */
+    @Value("${spring.application.name:}")
+    private String applicationName;
 
     @Around("@annotation(auditLog)")
     public Object logAuditActivity(ProceedingJoinPoint joinPoint, AuditLog auditLog) throws Throwable {
@@ -94,6 +99,11 @@ public class AuditLogAspect {
                         .statusCode(statusCode)
                         .timestamp(LocalDateTime.now())
                         .errorMessage(errorMessage)
+                        .sourceService(applicationName.toLowerCase().replaceFirst("^goatsports-", ""))
+                        .correlationId(correlationId(request))
+                        .httpMethod(request != null ? request.getMethod() : null)
+                        .requestUri(request != null ? request.getRequestURI() : null)
+                        .userAgent(request != null ? request.getHeader("User-Agent") : null)
                         .build();
 
                 kafkaTemplate.send(userLogTopic, event)
@@ -110,6 +120,13 @@ public class AuditLogAspect {
                 log.error("Error generating/sending AOP audit log event", ex);
             }
         }
+    }
+
+    /** CorrelationIdFilter của mỗi service đặt MDC "correlationId" theo header gateway gửi xuống. */
+    private String correlationId(HttpServletRequest request) {
+        String fromMdc = MDC.get("correlationId");
+        if (fromMdc != null && !fromMdc.isBlank()) return fromMdc;
+        return request != null ? request.getHeader("X-Correlation-Id") : null;
     }
 
     private HttpServletRequest getRequest() {

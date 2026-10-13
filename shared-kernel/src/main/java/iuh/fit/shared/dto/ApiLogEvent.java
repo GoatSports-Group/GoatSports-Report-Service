@@ -19,4 +19,9 @@ public class ApiLogEvent {
     private int statusCode;
     private LocalDateTime timestamp;
     private String errorMessage;
+    private String sourceService;
+    private String correlationId;
+    private String httpMethod;
+    private String requestUri;
+    private String userAgent;
 }
