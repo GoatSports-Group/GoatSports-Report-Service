@@ -45,6 +45,47 @@ final class ReportLabels {
         };
     }
 
+    /** Trạng thái khoản hoàn tiền (trang Tài chính của admin dùng cùng cách gọi). */
+    static String refundStatus(String status) {
+        if (status == null) return DASH;
+        return switch (status) {
+            case "CREATED" -> "Mới tạo";
+            case "AWAITING_CLAIM" -> "Chờ người chơi nhận";
+            case "AWAITING_BANK_ACCOUNT" -> "Chờ liên kết ngân hàng";
+            case "PENDING" -> "Đang chờ chi";
+            case "PROCESSING" -> "Đang chi";
+            case "SUCCEEDED" -> "Đã hoàn";
+            case "FAILED" -> "Chi lỗi";
+            case "MANUAL_REVIEW" -> "Chờ chủ sân hoàn tay";
+            default -> status;
+        };
+    }
+
+    /** Trạng thái một lượt chi qua payOS (chủ sân rút tiền / chi hoàn cho người chơi). */
+    static String payoutStatus(String status) {
+        if (status == null) return DASH;
+        return switch (status) {
+            case "PENDING" -> "Chờ gửi";
+            case "PROCESSING" -> "Đang chuyển";
+            case "SUCCEEDED" -> "Thành công";
+            case "FAILED" -> "Thất bại";
+            case "CANCELLED" -> "Đã hủy";
+            case "MANUAL_REVIEW" -> "Chờ đối soát";
+            default -> status;
+        };
+    }
+
+    /** Khoản thu gốc của một khoản hoàn. */
+    static String paymentPurpose(String purpose) {
+        if (purpose == null) return DASH;
+        return switch (purpose) {
+            case "BOOKING_DEPOSIT" -> "Đặt cọc sân";
+            case "BOOKING_REMAINING" -> "Tiền sân còn lại";
+            case "TOURNAMENT_FEE" -> "Lệ phí giải đấu";
+            default -> purpose;
+        };
+    }
+
     /** Trạng thái khoản thanh toán trong thống kê doanh thu. */
     static String paymentStatus(String status) {
         if (status == null) return "Không xác định";

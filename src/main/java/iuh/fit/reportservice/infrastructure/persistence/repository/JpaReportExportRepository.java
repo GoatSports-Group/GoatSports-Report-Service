@@ -15,8 +15,8 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface JpaReportExportRepository extends JpaRepository<ReportExportEntity, UUID> {
-    List<ReportExportEntity> findTop20ByRequestedByAndReportTypeAndExpiresAtAfterOrderByCreatedAtDesc(
-            UUID requestedBy, String reportType, Instant now);
+    List<ReportExportEntity> findTop20ByRequestedByAndReportTypeInAndExpiresAtAfterOrderByCreatedAtDesc(
+            UUID requestedBy, Collection<String> reportTypes, Instant now);
 
     Optional<ReportExportEntity> findFirstByRequestedByAndFilterKeyAndStatusInAndCreatedAtAfterOrderByCreatedAtDesc(
             UUID requestedBy, String filterKey, Collection<String> statuses, Instant createdAfter);

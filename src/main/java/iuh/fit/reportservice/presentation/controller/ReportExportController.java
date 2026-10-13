@@ -1,6 +1,7 @@
 package iuh.fit.reportservice.presentation.controller;
 
 import iuh.fit.reportservice.application.dto.report.AdminBookingExportRequest;
+import iuh.fit.reportservice.application.dto.report.FinanceExportRequest;
 import iuh.fit.reportservice.application.dto.report.ReportExportFile;
 import iuh.fit.reportservice.application.dto.report.ReportExportView;
 import iuh.fit.reportservice.application.exception.ServiceException;
@@ -30,6 +31,9 @@ import java.util.UUID;
 @RequestMapping("/api/v1/reports/exports")
 @RequiredArgsConstructor
 public class ReportExportController {
+    /** Ai xuất được ít nhất một loại báo cáo nền; mỗi người chỉ thấy / tải báo cáo do chính mình tạo. */
+    private static final String EXPORT_VIEWERS = "hasAnyAuthority('EXPORT_ALL_BOOKINGS', 'GET_PLATFORM_FINANCE')";
+
     private final ReportExportPort reportExportPort;
     private final CurrentUserProvider currentUserProvider;
 
@@ -42,21 +46,31 @@ public class ReportExportController {
                 .body(reportExportPort.requestAdminBookingExport(currentUserId(), request));
     }
 
+    @PostMapping("/finance")
+    @PreAuthorize("hasAuthority('GET_PLATFORM_FINANCE')")
+    @AuditLog(action = "EXPORT_PLATFORM_FINANCE", description = "Yêu cầu xuất báo cáo tài chính toàn nền tảng")
+    public ResponseEntity<ReportExportView> requestFinanceExport(@RequestBody FinanceExportRequest request)
+            throws ServiceException {
+        return ResponseEntity.status(HttpStatus.ACCEPTED)
+                .body(reportExportPort.requestFinanceExport(currentUserId(), request));
+    }
+
+    /** {@code type} nhận nhiều loại, vd {@code FINANCE_REFUNDS,FINANCE_PAYOUTS} cho trang Tài chính. */
     @GetMapping
-    @PreAuthorize("hasAuthority('EXPORT_ALL_BOOKINGS')")
-    public List<ReportExportView> listExports(@RequestParam(defaultValue = "ADMIN_BOOKINGS") String type)
+    @PreAuthorize(EXPORT_VIEWERS)
+    public List<ReportExportView> listExports(@RequestParam(defaultValue = "ADMIN_BOOKINGS") List<String> type)
             throws ServiceException {
         return reportExportPort.listExports(currentUserId(), type);
     }
 
     @GetMapping("/{exportId}")
-    @PreAuthorize("hasAuthority('EXPORT_ALL_BOOKINGS')")
+    @PreAuthorize(EXPORT_VIEWERS)
     public ReportExportView getExport(@PathVariable UUID exportId) throws ServiceException {
         return reportExportPort.getExport(currentUserId(), exportId);
     }
 
     @GetMapping("/{exportId}/file")
-    @PreAuthorize("hasAuthority('EXPORT_ALL_BOOKINGS')")
+    @PreAuthorize(EXPORT_VIEWERS)
     @AuditLog(action = "DOWNLOAD_REPORT_EXPORT", description = "Tải báo cáo đã xuất #{#exportId}")
     public ResponseEntity<byte[]> download(@PathVariable UUID exportId) throws ServiceException {
         ReportExportFile file = reportExportPort.download(currentUserId(), exportId);

@@ -43,6 +43,7 @@ class ReportExportWorkerTest {
     @Mock private VenueClient venueClient;
     @Mock private ReportAdapter reportAdapter;
     @Mock private BookingSummaryPdfRenderer summaryRenderer;
+    @Mock private FinanceReportRenderer financeRenderer;
     @Mock private NotificationClient notificationClient;
 
     private final ObjectMapper objectMapper = JsonMapper.builder().build();
@@ -52,7 +53,7 @@ class ReportExportWorkerTest {
     @BeforeEach
     void setUp() {
         worker = new ReportExportWorker(repository, fileRepository, venueClient, reportAdapter, summaryRenderer,
-                notificationClient, objectMapper);
+                financeRenderer, notificationClient, objectMapper);
         job = new ReportExportEntity();
         job.setExportId(UUID.randomUUID());
         job.setReportType("ADMIN_BOOKINGS");
@@ -88,6 +89,35 @@ class ReportExportWorkerTest {
         assertThat(sent.getValue().receiverId()).isEqualTo(job.getRequestedBy());
         assertThat(sent.getValue().type()).isEqualTo("REPORT_EXPORT");
         assertThat(sent.getValue().content()).contains("2 đơn");
+    }
+
+    @Test
+    void buildsAFinanceReportFromPaymentServiceAndPointsTheBellAtTheFinancePage() throws Exception {
+        job.setReportType("FINANCE_PAYOUTS");
+        job.setFormat("pdf");
+        job.setFilterJson("{\"payoutKind\":\"OWNER_WITHDRAWAL\",\"statuses\":[\"FAILED\"],\"fromDate\":\"2026-10-01\",\"toDate\":\"2026-10-13\"}");
+        job.setFilterSummary("Kỳ: 01/10/2026 – 13/10/2026");
+        when(repository.findClaimable(any(), any())).thenReturn(List.of(job.getExportId()));
+        when(repository.claim(eq(job.getExportId()), any(), any())).thenReturn(1);
+        when(financeRenderer.render(eq("FINANCE_PAYOUTS"), any(), eq("pdf"), eq("Kỳ: 01/10/2026 – 13/10/2026")))
+                .thenReturn(new RenderedExport(new byte[]{9, 9}, 4, "chu-san-rut-tien-"));
+
+        worker.poll();
+
+        ArgumentCaptor<iuh.fit.reportservice.application.dto.report.FinanceExportRequest.Filter> filter =
+                ArgumentCaptor.forClass(iuh.fit.reportservice.application.dto.report.FinanceExportRequest.Filter.class);
+        verify(financeRenderer).render(eq("FINANCE_PAYOUTS"), filter.capture(), eq("pdf"), any());
+        assertThat(filter.getValue().statuses()).containsExactly("FAILED");
+        assertThat(filter.getValue().toDate()).isEqualTo(java.time.LocalDate.of(2026, 10, 13));
+        verify(venueClient, never()).exportBookings(any(), any(), any(), any(), any(), any());
+        assertThat(job.getStatus()).isEqualTo("DONE");
+        assertThat(job.getFileName()).isEqualTo("chu-san-rut-tien-20261012-1100.pdf");
+        ArgumentCaptor<NotificationClient.CreateNotificationRequest> sent =
+                ArgumentCaptor.forClass(NotificationClient.CreateNotificationRequest.class);
+        verify(notificationClient).createNotification(sent.capture());
+        assertThat(sent.getValue().title()).isEqualTo("Báo cáo chi trả đã sẵn sàng");
+        assertThat(sent.getValue().content()).contains("4 lượt chi", "trang Tài chính");
+        assertThat(sent.getValue().referenceType()).isEqualTo("FINANCE_REPORT_EXPORT");
     }
 
     @Test

@@ -1,6 +1,7 @@
 package iuh.fit.reportservice.infrastructure.report;
 
 import feign.FeignException;
+import iuh.fit.reportservice.application.dto.report.FinanceExportRequest;
 import iuh.fit.reportservice.application.dto.report.OwnerBookingReportFilter;
 import iuh.fit.reportservice.application.dto.response.base.BaseResponse;
 import iuh.fit.reportservice.application.dto.venue.VenueOwnerBookingResponse;
@@ -33,8 +34,8 @@ import static iuh.fit.reportservice.infrastructure.report.ReportExportAdapter.PE
 
 /**
  * Dựng file cho các job xuất báo cáo ở nền: nhận job bằng lease (nhiều instance không làm trùng, worker chết giữa chừng
- * thì job được nhận lại khi lease hết), lấy dữ liệu một lần từ venue-service, dựng Excel (danh sách) hoặc PDF (tóm tắt),
- * lưu file và báo cho người yêu cầu qua chuông thông báo.
+ * thì job được nhận lại khi lease hết), lấy dữ liệu một lần (đơn đặt sân từ venue-service, tài chính từ
+ * payment-service), dựng file bằng Jasper, lưu lại và báo cho người yêu cầu qua chuông thông báo.
  */
 @Component
 @RequiredArgsConstructor
@@ -52,6 +53,7 @@ public class ReportExportWorker {
     private final VenueClient venueClient;
     private final ReportAdapter reportAdapter;
     private final BookingSummaryPdfRenderer summaryRenderer;
+    private final FinanceReportRenderer financeRenderer;
     private final NotificationClient notificationClient;
     private final ObjectMapper objectMapper;
 
@@ -80,30 +82,41 @@ public class ReportExportWorker {
             if (job.getAttempts() > MAX_ATTEMPTS) {
                 throw new ServiceException("Tạo báo cáo bị gián đoạn nhiều lần. Vui lòng xuất lại.");
             }
-            OwnerBookingReportFilter filter = objectMapper.readValue(job.getFilterJson(), OwnerBookingReportFilter.class);
-            List<VenueOwnerBookingResponse> bookings = fetch(filter);
             boolean excel = "xlsx".equals(job.getFormat());
-            byte[] data = excel
-                    ? reportAdapter.renderBookingTable("xlsx", job.getFilterSummary(), null, bookings)
-                    : summaryRenderer.render(bookings, job.getFilterSummary(), job.getCreatedAt());
+            RenderedExport rendered = FinanceReportRenderer.handles(job.getReportType())
+                    ? financeRenderer.render(job.getReportType(),
+                    objectMapper.readValue(job.getFilterJson(), FinanceExportRequest.Filter.class), job.getFormat(),
+                    job.getFilterSummary())
+                    : renderBookings(job, excel);
+            byte[] data = rendered.data();
 
             fileRepository.save(new ReportExportFileEntity(exportId, data));
             job.setStatus(DONE);
-            job.setRowCount(bookings.size());
-            job.setFileName((excel ? "don-dat-san-" : "tong-hop-don-dat-san-") + FILE_STAMP.format(job.getCreatedAt())
-                    + (excel ? ".xlsx" : ".pdf"));
+            job.setRowCount(rendered.rows());
+            job.setFileName(rendered.filePrefix() + FILE_STAMP.format(job.getCreatedAt()) + (excel ? ".xlsx" : ".pdf"));
             job.setContentType(excel ? XLSX_TYPE : "application/pdf");
             job.setFileSize((long) data.length);
             job.setFailureReason(null);
             job.setLeaseUntil(null);
             job.setCompletedAt(Instant.now());
             repository.save(job);
-            log.info("Report export {} done: format={}, rows={}, bytes={}, took={} ms", exportId, job.getFormat(),
-                    bookings.size(), data.length, (System.nanoTime() - startedAt) / 1_000_000);
+            log.info("Report export {} done: type={}, format={}, rows={}, bytes={}, took={} ms", exportId,
+                    job.getReportType(), job.getFormat(), rendered.rows(), data.length,
+                    (System.nanoTime() - startedAt) / 1_000_000);
             notifyRequester(job, true);
         } catch (Exception exception) {
             fail(job, exception);
         }
+    }
+
+    /** Đơn đặt sân: Excel là bảng danh sách, PDF là báo cáo tổng hợp. */
+    private RenderedExport renderBookings(ReportExportEntity job, boolean excel) throws Exception {
+        OwnerBookingReportFilter filter = objectMapper.readValue(job.getFilterJson(), OwnerBookingReportFilter.class);
+        List<VenueOwnerBookingResponse> bookings = fetch(filter);
+        byte[] data = excel
+                ? reportAdapter.renderBookingTable("xlsx", job.getFilterSummary(), null, bookings)
+                : summaryRenderer.render(bookings, job.getFilterSummary(), job.getCreatedAt());
+        return new RenderedExport(data, bookings.size(), excel ? "don-dat-san-" : "tong-hop-don-dat-san-");
     }
 
     private List<VenueOwnerBookingResponse> fetch(OwnerBookingReportFilter filter) throws ServiceException {
@@ -117,7 +130,7 @@ public class ReportExportWorker {
 
     /** Lỗi nghiệp vụ (vd quá 10.000 đơn, 4xx) thì dừng ngay; lỗi tạm thời (mất kết nối, 5xx) thì thử lại tới 3 lần. */
     private void fail(ReportExportEntity job, Exception exception) {
-        String reason = reason(exception);
+        String reason = reason(job, exception);
         boolean permanent = exception instanceof ServiceException
                 || (exception instanceof FeignException feign && feign.status() >= 400 && feign.status() < 500);
         job.setFailureReason(reason);
@@ -135,17 +148,18 @@ public class ReportExportWorker {
         notifyRequester(job, false);
     }
 
-    private String reason(Exception exception) {
+    private String reason(ReportExportEntity job, Exception exception) {
         String message = exception.getMessage();
         if (exception instanceof FeignException feign) {
-            message = feign.status() <= 0 ? "Không kết nối được dịch vụ quản lý sân." : backendMessage(feign);
+            String service = FinanceReportRenderer.handles(job.getReportType()) ? "dịch vụ thanh toán" : "dịch vụ quản lý sân";
+            message = feign.status() <= 0 ? "Không kết nối được " + service + "." : backendMessage(feign, service);
         }
         if (message == null || message.isBlank()) message = "Lỗi khi tạo báo cáo.";
         return message.length() > 500 ? message.substring(0, 497) + "..." : message;
     }
 
-    /** venue-service trả lỗi dạng {"message": "..."}: lấy đúng câu đó để người dùng đọc được. */
-    private String backendMessage(FeignException feign) {
+    /** venue-service / payment-service trả lỗi dạng {"message": "..."}: lấy đúng câu đó để người dùng đọc được. */
+    private String backendMessage(FeignException feign, String service) {
         try {
             JsonNode body = objectMapper.readTree(feign.contentUTF8());
             String message = body.path("message").asText("");
@@ -153,24 +167,42 @@ public class ReportExportWorker {
         } catch (Exception ignored) {
             // thân lỗi không phải JSON
         }
-        return "Dịch vụ quản lý sân báo lỗi (" + feign.status() + ").";
+        return Character.toUpperCase(service.charAt(0)) + service.substring(1) + " báo lỗi (" + feign.status() + ").";
     }
 
     private void notifyRequester(ReportExportEntity job, boolean done) {
-        String kind = "xlsx".equals(job.getFormat()) ? "Excel danh sách đơn" : "PDF tổng hợp";
-        String title = done ? "Báo cáo đơn đặt sân đã sẵn sàng" : "Không tạo được báo cáo đơn đặt sân";
+        Notice notice = Notice.of(job.getReportType(), "xlsx".equals(job.getFormat()));
+        String title = done ? "Báo cáo " + notice.subject() + " đã sẵn sàng" : "Không tạo được báo cáo " + notice.subject();
         String content = done
-                ? kind + " · " + BookingSummaryPdfRenderer.number(job.getRowCount() == null ? 0 : job.getRowCount())
-                + " đơn. Tải tại trang Đơn đặt sân, mục Báo cáo đã xuất (giữ 7 ngày)."
-                : kind + ": " + job.getFailureReason();
+                ? notice.kind() + " · " + BookingSummaryPdfRenderer.number(job.getRowCount() == null ? 0 : job.getRowCount())
+                + " " + notice.unit() + ". Tải tại trang " + notice.page() + ", mục Báo cáo đã xuất (giữ 7 ngày)."
+                : notice.kind() + ": " + job.getFailureReason();
         // Mỗi kết cục một eventId cố định: worker chạy lại cũng không gửi trùng.
         UUID eventId = UUID.nameUUIDFromBytes((job.getExportId() + (done ? ":done" : ":failed")).getBytes(StandardCharsets.UTF_8));
         try {
             notificationClient.createNotification(new NotificationClient.CreateNotificationRequest(eventId,
-                    job.getRequestedBy(), title, content, "REPORT_EXPORT", "REPORT", "REPORT_EXPORT", job.getExportId()));
+                    job.getRequestedBy(), title, content, "REPORT_EXPORT", "REPORT", notice.referenceType(), job.getExportId()));
         } catch (Exception exception) {
             // Không chặn job: người dùng vẫn thấy trạng thái trong mục Báo cáo đã xuất.
             log.warn("Could not notify requester of report export {}: {}", job.getExportId(), exception.getMessage());
+        }
+    }
+
+    /**
+     * Cách gọi tên trong thông báo theo loại báo cáo. {@code referenceType} cho chuông biết mở trang nào: báo cáo tài
+     * chính mở trang Tài chính, còn lại mở trang Đơn đặt sân.
+     */
+    private record Notice(String subject, String kind, String unit, String page, String referenceType) {
+        static Notice of(String reportType, boolean excel) {
+            String kind = excel ? "Excel danh sách" : "PDF";
+            if (FinanceReportRenderer.REFUNDS.equals(reportType)) {
+                return new Notice("hoàn tiền", kind, "khoản hoàn", "Tài chính", "FINANCE_REPORT_EXPORT");
+            }
+            if (FinanceReportRenderer.PAYOUTS.equals(reportType)) {
+                return new Notice("chi trả", kind, "lượt chi", "Tài chính", "FINANCE_REPORT_EXPORT");
+            }
+            return new Notice("đơn đặt sân", excel ? "Excel danh sách đơn" : "PDF tổng hợp", "đơn", "Đơn đặt sân",
+                    "REPORT_EXPORT");
         }
     }
 }

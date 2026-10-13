@@ -1,6 +1,7 @@
 package iuh.fit.reportservice.infrastructure.report;
 
 import iuh.fit.reportservice.application.dto.report.AdminBookingExportRequest;
+import iuh.fit.reportservice.application.dto.report.FinanceExportRequest;
 import iuh.fit.reportservice.application.dto.report.OwnerBookingReportFilter;
 import iuh.fit.reportservice.application.dto.report.ReportExportFile;
 import iuh.fit.reportservice.application.dto.report.ReportExportView;
@@ -20,6 +21,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HexFormat;
+import java.util.Collection;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
@@ -50,8 +52,22 @@ public class ReportExportAdapter implements ReportExportPort {
         OwnerBookingReportFilter filter = normalize(request.filter());
         OwnerBookingReportFilter.validate(filter, format);
 
-        String filterJson = objectMapper.writeValueAsString(filter);
-        String filterKey = sha256(ADMIN_BOOKINGS + "|" + format + "|" + filterJson);
+        return createJob(requesterId, ADMIN_BOOKINGS, format, objectMapper.writeValueAsString(filter),
+                summary(filter, request.venueName(), request.courtName()));
+    }
+
+    @Override
+    public ReportExportView requestFinanceExport(UUID requesterId, FinanceExportRequest request) throws ServiceException {
+        if (request == null) throw new ServiceException("Thiếu yêu cầu xuất báo cáo.");
+        FinanceExportRequest normalized = request.normalized();
+        return createJob(requesterId, FinanceReportRenderer.reportType(normalized.kind()), normalized.format(),
+                objectMapper.writeValueAsString(normalized.filter()), financeSummary(normalized));
+    }
+
+    /** Job mới ở PENDING (worker dựng file ở nền); cùng loại, định dạng và bộ lọc trong 5 phút thì dùng lại job cũ. */
+    private ReportExportView createJob(UUID requesterId, String reportType, String format, String filterJson,
+                                       String filterSummary) {
+        String filterKey = sha256(reportType + "|" + format + "|" + filterJson);
         Instant now = Instant.now();
         var reusable = repository.findFirstByRequestedByAndFilterKeyAndStatusInAndCreatedAtAfterOrderByCreatedAtDesc(
                 requesterId, filterKey, Set.of(PENDING, RUNNING, DONE), now.minus(REUSE_WINDOW));
@@ -59,12 +75,12 @@ public class ReportExportAdapter implements ReportExportPort {
 
         ReportExportEntity entity = new ReportExportEntity();
         entity.setExportId(UUID.randomUUID());
-        entity.setReportType(ADMIN_BOOKINGS);
+        entity.setReportType(reportType);
         entity.setFormat(format);
         entity.setRequestedBy(requesterId);
         entity.setFilterJson(filterJson);
         entity.setFilterKey(filterKey);
-        entity.setFilterSummary(summary(filter, request.venueName(), request.courtName()));
+        entity.setFilterSummary(filterSummary);
         entity.setStatus(PENDING);
         entity.setAttempts(0);
         entity.setCreatedAt(now);
@@ -74,9 +90,10 @@ public class ReportExportAdapter implements ReportExportPort {
     }
 
     @Override
-    public List<ReportExportView> listExports(UUID requesterId, String reportType) {
-        return repository.findTop20ByRequestedByAndReportTypeAndExpiresAtAfterOrderByCreatedAtDesc(
-                        requesterId, reportType == null ? ADMIN_BOOKINGS : reportType, Instant.now())
+    public List<ReportExportView> listExports(UUID requesterId, Collection<String> reportTypes) {
+        Collection<String> types = reportTypes == null || reportTypes.isEmpty() ? List.of(ADMIN_BOOKINGS) : reportTypes;
+        return repository.findTop20ByRequestedByAndReportTypeInAndExpiresAtAfterOrderByCreatedAtDesc(
+                        requesterId, types, Instant.now())
                 .stream().map(ReportExportAdapter::toView).toList();
     }
 
@@ -116,6 +133,18 @@ public class ReportExportAdapter implements ReportExportPort {
         if (filter.venueCourtId() != null) parts.add("Sân: " + (blank(courtName) ? "đã chọn" : courtName.trim()));
         String rest = OwnerBookingReportMapper.filterSummary(filter);
         if (parts.isEmpty() || !rest.startsWith("Phạm vi:")) parts.add(rest);
+        String summary = String.join("  |  ", parts);
+        return summary.length() > 500 ? summary.substring(0, 497) + "..." : summary;
+    }
+
+    /** "Kỳ: 01/10/2026 – 13/10/2026  |  Cần xử lý  |  Tìm: "GSA02"  |  Tạo quá 7 ngày" (in lên báo cáo). */
+    static String financeSummary(FinanceExportRequest request) {
+        FinanceExportRequest.Filter filter = request.filter();
+        List<String> parts = new ArrayList<>();
+        parts.add("Kỳ: " + ReportLabels.DATE.format(filter.fromDate()) + " – " + ReportLabels.DATE.format(filter.toDate()));
+        if (request.scopeLabel() != null) parts.add(request.scopeLabel());
+        if (filter.keyword() != null) parts.add("Tìm: \"" + filter.keyword() + "\"");
+        if (filter.olderThanDays() != null) parts.add("Tạo quá " + filter.olderThanDays() + " ngày");
         String summary = String.join("  |  ", parts);
         return summary.length() > 500 ? summary.substring(0, 497) + "..." : summary;
     }
