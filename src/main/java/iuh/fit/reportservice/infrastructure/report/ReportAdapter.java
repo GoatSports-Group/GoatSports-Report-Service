@@ -5,14 +5,12 @@ import iuh.fit.reportservice.application.dto.report.OwnerBookingReportFilter;
 import iuh.fit.reportservice.application.dto.report.OwnerBookingReportRow;
 import iuh.fit.reportservice.application.dto.report.OwnerRevenueReportFilter;
 import iuh.fit.reportservice.application.dto.report.OwnerRevenueReportRow;
-import iuh.fit.reportservice.application.dto.report.UserDetailReportResponse;
 import iuh.fit.reportservice.application.dto.response.base.BaseResponse;
 import iuh.fit.reportservice.application.dto.venue.VenueOwnerBookingPageResponse;
 import iuh.fit.reportservice.application.dto.venue.VenueOwnerBookingResponse;
 import iuh.fit.reportservice.application.dto.venue.VenueOwnerRevenueResponse;
 import iuh.fit.reportservice.application.exception.ServiceException;
 import iuh.fit.reportservice.application.port.report.ReportPort;
-import iuh.fit.reportservice.infrastructure.external.client.AuthClient;
 import iuh.fit.reportservice.infrastructure.external.client.VenueClient;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
@@ -22,13 +20,9 @@ import net.sf.jasperreports.engine.JasperFillManager;
 import net.sf.jasperreports.engine.JasperPrint;
 import net.sf.jasperreports.engine.JasperReport;
 import net.sf.jasperreports.engine.data.JRBeanCollectionDataSource;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 
-import javax.sql.DataSource;
 import java.io.IOException;
-import java.sql.Connection;
-import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -48,12 +42,9 @@ public class ReportAdapter implements ReportPort {
     private static final int BOOKING_PAGE_SIZE = 20;
     private static final int MAX_BOOKING_EXPORT_ROWS = 10_000;
 
-    private final AuthClient authClient;
     private final VenueClient venueClient;
     private final JasperRenderer renderer;
 
-    @Qualifier("authDataSource")
-    private final DataSource authDataSource;
 
     // Mẫu đã biên dịch được nạp một lần lúc khởi động và dùng lại cho mọi yêu cầu.
     private JasperReport ownerBookingReport;
@@ -76,27 +67,6 @@ public class ReportAdapter implements ReportPort {
         } catch (IOException | JRException exception) {
             throw new IllegalStateException("Không thể khởi tạo báo cáo đơn đặt sân.", exception);
         }
-    }
-
-    /** Danh sách người dùng đọc thẳng từ DB của auth-service (chỉ đọc) qua datasource riêng. */
-    @Override
-    public byte[] exportUsers(String format) throws ServiceException, JRException, IOException, SQLException {
-        JasperReport report = renderer.load("templates/jasper/user/users.jasper");
-        try (Connection connection = authDataSource.getConnection()) {
-            Map<String, Object> parameters = new HashMap<>();
-            parameters.put("REPORT_DATE", ReportLabels.today());
-            return renderer.export(JasperFillManager.fillReport(report, parameters, connection), format);
-        }
-    }
-
-    @Override
-    public byte[] exportUserDetail(String format, String userId) throws ServiceException, JRException, IOException {
-        UserDetailReportResponse user = authClient.getUserById(userId).getData();
-        Map<String, Object> parameters = new HashMap<>();
-        parameters.put("REPORT_DATE", ReportLabels.today());
-        JasperPrint print = JasperFillManager.fillReport(renderer.load("templates/jasper/user/user-detail.jasper"),
-                parameters, new JRBeanCollectionDataSource(Collections.singletonList(user)));
-        return renderer.export(print, format);
     }
 
     @Override

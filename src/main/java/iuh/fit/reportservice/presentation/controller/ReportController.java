@@ -30,37 +30,6 @@ public class ReportController {
     private final PeriodicReportPort periodicReportPort;
     private final CurrentUserProvider currentUserProvider;
 
-    @GetMapping("/export/users")
-    @PreAuthorize("hasAuthority('EXPORT_USERS')")
-    @AuditLog(action = "EXPORT_USERS", description = "Xuất danh sách người dùng")
-    public ResponseEntity<byte[]> exportUsers(@RequestParam("format") String format) {
-        try {
-            byte[] data = reportPort.exportUsers(format);
-
-            return getResponseEntity(format, data);
-        } catch (Exception e) {
-            e.printStackTrace();
-            return ResponseEntity.internalServerError().body(null);
-        }
-    }
-
-    @GetMapping("/export/users/{userId}")
-    @PreAuthorize("hasAuthority('EXPORT_USER')")
-    @AuditLog(action = "EXPORT_USER", description = "Xuất thông tin người dùng #{#userId}")
-    public ResponseEntity<byte[]> exportUserDetail(
-            @PathVariable("userId") String userId,
-            @RequestParam String format
-    ) {
-        try {
-            byte[] data = reportPort.exportUserDetail(format, userId);
-
-            return getResponseEntity(format, data);
-        } catch (Exception e) {
-            e.printStackTrace();
-            return ResponseEntity.internalServerError().body(null);
-        }
-    }
-
     @GetMapping("/export/owner-bookings")
     @PreAuthorize("hasAuthority('GET_OWN_BOOKINGS')")
     @AuditLog(action = "EXPORT_OWN_BOOKINGS", description = "Xuất báo cáo đơn đặt sân của chủ sân")
@@ -217,10 +186,6 @@ public class ReportController {
         return new OwnerBookingReportFilter(
                 venueId, venueCourtId, status, paymentStatus, query, fromDate, toDate
         );
-    }
-
-    private ResponseEntity<byte[]> getResponseEntity(@RequestParam("format") String format, byte[] data) {
-        return getResponseEntity(format, "bao_cao." + format.toLowerCase(), data);
     }
 
     private ResponseEntity<byte[]> getResponseEntity(String format, String filename, byte[] data) {
