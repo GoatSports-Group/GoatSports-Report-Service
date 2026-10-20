@@ -1,0 +1,61 @@
+stages:
+  - test
+  - build
+  - deploy
+
+default:
+  image: maven:3.9-eclipse-temurin-21
+
+variables:
+  MAVEN_OPTS: "-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository"
+  JENKINS_JOB_NAME: "GoatSports-CD"
+  JENKINS_SERVICE_NAME: "report-service"
+
+cache:
+  key: maven-dependencies
+  paths:
+    - .m2/repository/
+
+unit_test:
+  stage: test
+  script:
+    - mvn -f shared-kernel/pom.xml clean install -DskipTests
+    - mvn -B test
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+
+build_and_push_image:
+  stage: build
+  script:
+    - test -n "$DOCKER_USERNAME"
+    - test -n "$DOCKER_PASSWORD"
+    - |
+      mvn -B -DskipTests compile jib:build \
+        -DskipTests \
+        -Djib.to.auth.username="${DOCKER_USERNAME}" \
+        -Djib.to.auth.password="${DOCKER_PASSWORD}"
+    - |
+      mvn -B -DskipTests compile jib:build \
+        -DskipTests \
+        -Djib.to.auth.username="${DOCKER_USERNAME}" \
+        -Djib.to.auth.password="${DOCKER_PASSWORD}"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+
+trigger_jenkins_deploy:
+  stage: deploy
+  image: curlimages/curl:latest
+  script:
+    - test -n "$JENKINS_URL"
+    - test -n "$JENKINS_USER"
+    - test -n "$JENKINS_API_TOKEN"
+    - test -n "$JENKINS_JOB_NAME"
+    - test -n "$JENKINS_SERVICE_NAME"
+    - |
+      curl --fail --silent --show-error \
+        --user "${JENKINS_USER}:${JENKINS_API_TOKEN}" \
+        --request POST \
+        --data-urlencode "SERVICE_NAME=${JENKINS_SERVICE_NAME}" \
+        "${JENKINS_URL%/}/job/${JENKINS_JOB_NAME}/buildWithParameters"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
