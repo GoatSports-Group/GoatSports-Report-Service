@@ -195,7 +195,7 @@ public class AuditLogAspect {
         // Try checking parameter names first (for direct String userId / String
         // username / String email args)
         try {
-            String[] parameterNames = ((org.aspectj.lang.reflect.MethodSignature) joinPoint.getSignature())
+            String[] parameterNames = ((MethodSignature) joinPoint.getSignature())
                     .getParameterNames();
             Object[] args = joinPoint.getArgs();
             if (parameterNames != null && args != null) {
@@ -233,7 +233,7 @@ public class AuditLogAspect {
 
     private String getFieldValue(Object obj, String fieldName) {
         try {
-            java.lang.reflect.Method method;
+            Method method;
             try {
                 method = obj.getClass().getMethod(fieldName);
             } catch (NoSuchMethodException e) {
@@ -250,7 +250,7 @@ public class AuditLogAspect {
 
     private String getNestedUserFieldValue(Object obj) {
         try {
-            java.lang.reflect.Method userMethod;
+            Method userMethod;
             try {
                 userMethod = obj.getClass().getMethod("user");
             } catch (NoSuchMethodException e) {

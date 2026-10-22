@@ -5,6 +5,8 @@ import iuh.fit.reportservice.application.dto.venue.VenueOwnerPaymentResponse;
 import org.junit.jupiter.api.Test;
 
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -62,7 +64,7 @@ class BookingSummaryTest {
 
         assertThat(new String(pdf, 0, 5, StandardCharsets.US_ASCII)).isEqualTo("%PDF-");
         // Bản mẫu để xem bằng mắt sau khi chạy test.
-        java.nio.file.Files.write(java.nio.file.Path.of("target", "admin-booking-summary-sample.pdf"), pdf);
+        Files.write(Path.of("target", "admin-booking-summary-sample.pdf"), pdf);
         assertThat(new String(empty, 0, 5, StandardCharsets.US_ASCII)).isEqualTo("%PDF-");
         assertThat(BookingSummaryPdfRenderer.money(1_234_000)).isEqualTo("1.234.000 đ");
         assertThat(BookingSummaryPdfRenderer.percent(1.0 / 3)).isEqualTo("33,3%");

@@ -3,8 +3,10 @@ package iuh.fit.reportservice.infrastructure.report;
 import iuh.fit.reportservice.application.dto.report.OwnerRevenueReportFilter;
 import iuh.fit.reportservice.application.dto.report.PeriodicReportView;
 import iuh.fit.reportservice.application.dto.response.base.BaseResponse;
+import iuh.fit.reportservice.application.dto.venue.VenueOwnerDailyRevenueResponse;
 import iuh.fit.reportservice.application.dto.venue.VenueOwnerRevenuePeriodResponse;
 import iuh.fit.reportservice.application.dto.venue.VenueOwnerRevenueResponse;
+import iuh.fit.reportservice.application.dto.venue.VenueOwnerRevenueStatusResponse;
 import iuh.fit.reportservice.application.enums.ReportPeriodType;
 import iuh.fit.reportservice.application.exception.ServiceException;
 import iuh.fit.reportservice.application.port.report.PeriodicReportPort;
@@ -20,6 +22,7 @@ import org.springframework.stereotype.Service;
 import tools.jackson.databind.ObjectMapper;
 
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -134,15 +137,15 @@ public class PeriodicReportAdapter implements PeriodicReportPort {
         row(csv, "Thay đổi lượt đặt so với kỳ trước (%)", number(revenue.getBookingCountChangePercentage()));
         csv.append("\r\n");
         row(csv, "Ngày", "Doanh thu (VND)", "Giao dịch thành công");
-        for (var day : revenue.getDailyRevenue()) {
+        for (VenueOwnerDailyRevenueResponse day : revenue.getDailyRevenue()) {
             row(csv, day.getDate() == null ? "" : day.getDate().format(DAY), number(day.getRevenue()), number(day.getSucceededPaymentCount()));
         }
         csv.append("\r\n");
         row(csv, "Trạng thái thanh toán", "Số giao dịch", "Giá trị (VND)");
-        for (var status : revenue.getPaymentStatusBreakdown()) {
+        for (VenueOwnerRevenueStatusResponse status : revenue.getPaymentStatusBreakdown()) {
             row(csv, ReportLabels.paymentStatus(status.getStatus()), number(status.getPaymentCount()), number(status.getNominalAmount()));
         }
-        return csv.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        return csv.toString().getBytes(StandardCharsets.UTF_8);
     }
 
     private static void row(StringBuilder csv, String... cells) {

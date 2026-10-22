@@ -6,6 +6,7 @@ import iuh.fit.reportservice.application.exception.ServiceException;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 
@@ -69,7 +70,7 @@ public record FinanceExportRequest(
         String keyword = filter.keyword() == null || filter.keyword().isBlank() ? null : filter.keyword().trim();
         if (keyword != null && keyword.length() > 100) keyword = keyword.substring(0, 100);
         List<UUID> people = keyword == null || filter.people() == null ? List.of()
-                : filter.people().stream().filter(java.util.Objects::nonNull).distinct().sorted().limit(MAX_PEOPLE).toList();
+                : filter.people().stream().filter(Objects::nonNull).distinct().sorted().limit(MAX_PEOPLE).toList();
         Integer olderThanDays = refunds && filter.olderThanDays() != null && filter.olderThanDays() > 0
                 ? Math.min(filter.olderThanDays(), 3650) : null;
         String label = scopeLabel == null || scopeLabel.isBlank() ? null : scopeLabel.trim();

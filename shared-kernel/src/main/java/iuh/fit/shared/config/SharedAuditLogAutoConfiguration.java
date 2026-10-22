@@ -1,5 +1,6 @@
 package iuh.fit.shared.config;
 
+import feign.RequestInterceptor;
 import iuh.fit.shared.aspect.AuditLogAspect;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -18,7 +19,7 @@ public class SharedAuditLogAutoConfiguration {
     @ConditionalOnClass(name = "feign.RequestInterceptor")
     public static class FeignInterceptorConfiguration {
         @Bean
-        public feign.RequestInterceptor feignClientInterceptor() {
+        public RequestInterceptor feignClientInterceptor() {
             return new FeignClientInterceptor();
         }
     }

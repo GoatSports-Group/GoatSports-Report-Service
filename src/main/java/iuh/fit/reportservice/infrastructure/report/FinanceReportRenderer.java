@@ -26,6 +26,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 import java.util.function.Function;
+import java.util.stream.Stream;
 
 /**
  * Báo cáo Tài chính của admin (hoàn tiền / chi trả): lấy mọi dòng khớp bộ lọc từ payment-service một lần, gắn tên
@@ -131,7 +132,7 @@ public class FinanceReportRenderer {
             row.put("completedAt", time(payout.completedAt()));
             row.put("reference", lines(orDash(payout.referenceId()),
                     payout.providerPayoutId() == null ? null : "payOS: " + payout.providerPayoutId()));
-            String failure = String.join(" ", java.util.stream.Stream.of(payout.failureCode(), payout.failureReason())
+            String failure = String.join(" ", Stream.of(payout.failureCode(), payout.failureReason())
                     .filter(text -> text != null && !text.isBlank()).toList());
             row.put("failure", failure.isEmpty() ? DASH : failure);
             return row;

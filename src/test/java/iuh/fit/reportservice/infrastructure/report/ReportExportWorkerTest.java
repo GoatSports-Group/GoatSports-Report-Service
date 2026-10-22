@@ -2,6 +2,8 @@ package iuh.fit.reportservice.infrastructure.report;
 
 import feign.FeignException;
 import feign.Request;
+import feign.Response;
+import iuh.fit.reportservice.application.dto.report.FinanceExportRequest;
 import iuh.fit.reportservice.application.dto.response.base.BaseResponse;
 import iuh.fit.reportservice.application.dto.venue.VenueOwnerBookingResponse;
 import iuh.fit.reportservice.infrastructure.external.client.NotificationClient;
@@ -21,6 +23,8 @@ import tools.jackson.databind.json.JsonMapper;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -71,7 +75,7 @@ class ReportExportWorkerTest {
     void claimsAJobBuildsTheExcelFromOneVenueCallStoresItAndNotifies() throws Exception {
         when(repository.findClaimable(any(), any())).thenReturn(List.of(job.getExportId()));
         when(repository.claim(eq(job.getExportId()), any(), any())).thenReturn(1);
-        when(venueClient.exportBookings(isNull(), isNull(), eq("COMPLETED"), isNull(), eq(java.time.LocalDate.of(2026, 10, 1)), isNull()))
+        when(venueClient.exportBookings(isNull(), isNull(), eq("COMPLETED"), isNull(), eq(LocalDate.of(2026, 10, 1)), isNull()))
                 .thenReturn(new BaseResponse<>(200, List.of(new VenueOwnerBookingResponse(), new VenueOwnerBookingResponse()), "ok", null));
         when(reportAdapter.renderBookingTable(eq("xlsx"), eq("Trạng thái đơn: Hoàn tất"), isNull(), any()))
                 .thenReturn(new byte[]{1, 2, 3});
@@ -104,11 +108,11 @@ class ReportExportWorkerTest {
 
         worker.poll();
 
-        ArgumentCaptor<iuh.fit.reportservice.application.dto.report.FinanceExportRequest.Filter> filter =
-                ArgumentCaptor.forClass(iuh.fit.reportservice.application.dto.report.FinanceExportRequest.Filter.class);
+        ArgumentCaptor<FinanceExportRequest.Filter> filter =
+                ArgumentCaptor.forClass(FinanceExportRequest.Filter.class);
         verify(financeRenderer).render(eq("FINANCE_PAYOUTS"), filter.capture(), eq("pdf"), any());
         assertThat(filter.getValue().statuses()).containsExactly("FAILED");
-        assertThat(filter.getValue().toDate()).isEqualTo(java.time.LocalDate.of(2026, 10, 13));
+        assertThat(filter.getValue().toDate()).isEqualTo(LocalDate.of(2026, 10, 13));
         verify(venueClient, never()).exportBookings(any(), any(), any(), any(), any(), any());
         assertThat(job.getStatus()).isEqualTo("DONE");
         assertThat(job.getFileName()).isEqualTo("chu-san-rut-tien-20261012-1100.pdf");
@@ -157,10 +161,10 @@ class ReportExportWorkerTest {
     }
 
     private static FeignException feign(int status, String body) {
-        Map<String, java.util.Collection<String>> headers = new HashMap<>();
+        Map<String, Collection<String>> headers = new HashMap<>();
         Request request = Request.create(Request.HttpMethod.GET, "/internal/bookings/export", headers, null,
                 StandardCharsets.UTF_8, null);
-        return FeignException.errorStatus("VenueClient#exportBookings", feign.Response.builder()
+        return FeignException.errorStatus("VenueClient#exportBookings", Response.builder()
                 .status(status).reason("x").request(request).headers(headers)
                 .body(body, StandardCharsets.UTF_8).build());
     }

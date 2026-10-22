@@ -3,6 +3,7 @@ package iuh.fit.reportservice.infrastructure.report;
 import iuh.fit.reportservice.application.dto.report.AdminBookingExportRequest;
 import iuh.fit.reportservice.application.dto.report.FinanceExportRequest;
 import iuh.fit.reportservice.application.dto.report.OwnerBookingReportFilter;
+import iuh.fit.reportservice.application.dto.report.ReportExportView;
 import iuh.fit.reportservice.application.exception.ServiceException;
 import iuh.fit.reportservice.infrastructure.persistence.entity.ReportExportEntity;
 import iuh.fit.reportservice.infrastructure.persistence.repository.JpaReportExportFileRepository;
@@ -49,7 +50,7 @@ class ReportExportAdapterTest {
                 eq(requester), any(), any(), any())).thenReturn(Optional.empty());
         when(repository.save(any())).thenAnswer(call -> call.getArgument(0));
 
-        var view = adapter.requestAdminBookingExport(requester, new AdminBookingExportRequest(" XLSX ",
+        ReportExportView view = adapter.requestAdminBookingExport(requester, new AdminBookingExportRequest(" XLSX ",
                 new OwnerBookingReportFilter(venueId, null, "", "PAID", "  goat ", LocalDate.of(2026, 10, 1), null),
                 "Goat Arena", null));
 
@@ -69,7 +70,7 @@ class ReportExportAdapterTest {
         when(repository.findFirstByRequestedByAndFilterKeyAndStatusInAndCreatedAtAfterOrderByCreatedAtDesc(
                 eq(requester), any(), any(), any())).thenReturn(Optional.of(existing));
 
-        var view = adapter.requestAdminBookingExport(requester, new AdminBookingExportRequest("pdf",
+        ReportExportView view = adapter.requestAdminBookingExport(requester, new AdminBookingExportRequest("pdf",
                 new OwnerBookingReportFilter(null, null, null, null, null, null, null), null, null));
 
         assertThat(view.exportId()).isEqualTo(existing.getExportId());

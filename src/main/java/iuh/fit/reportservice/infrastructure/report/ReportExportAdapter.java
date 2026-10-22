@@ -24,6 +24,7 @@ import java.util.HexFormat;
 import java.util.Collection;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
@@ -69,7 +70,7 @@ public class ReportExportAdapter implements ReportExportPort {
                                        String filterSummary) {
         String filterKey = sha256(reportType + "|" + format + "|" + filterJson);
         Instant now = Instant.now();
-        var reusable = repository.findFirstByRequestedByAndFilterKeyAndStatusInAndCreatedAtAfterOrderByCreatedAtDesc(
+        Optional<ReportExportEntity> reusable = repository.findFirstByRequestedByAndFilterKeyAndStatusInAndCreatedAtAfterOrderByCreatedAtDesc(
                 requesterId, filterKey, Set.of(PENDING, RUNNING, DONE), now.minus(REUSE_WINDOW));
         if (reusable.isPresent()) return toView(reusable.get());
 

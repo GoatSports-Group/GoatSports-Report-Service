@@ -3,8 +3,10 @@ package iuh.fit.reportservice.infrastructure.report;
 import iuh.fit.reportservice.application.dto.report.OwnerRevenueReportFilter;
 import iuh.fit.reportservice.application.dto.report.PeriodicReportView;
 import iuh.fit.reportservice.application.dto.response.base.BaseResponse;
+import iuh.fit.reportservice.application.dto.venue.VenueOwnerDailyRevenueResponse;
 import iuh.fit.reportservice.application.dto.venue.VenueOwnerRevenuePeriodResponse;
 import iuh.fit.reportservice.application.dto.venue.VenueOwnerRevenueResponse;
+import iuh.fit.reportservice.application.dto.venue.VenueOwnerRevenueStatusResponse;
 import iuh.fit.reportservice.application.enums.ReportPeriodType;
 import iuh.fit.reportservice.application.exception.ServiceException;
 import iuh.fit.reportservice.infrastructure.external.client.VenueClient;
@@ -15,6 +17,7 @@ import org.mockito.ArgumentCaptor;
 import tools.jackson.databind.json.JsonMapper;
 
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
@@ -114,12 +117,12 @@ class PeriodicReportAdapterTest {
     @Test
     void csvExportReadsTheStoredSnapshotWithoutJasper() throws Exception {
         VenueOwnerRevenueResponse snapshot = revenue(new BigDecimal("1250000")).getData();
-        var day = new iuh.fit.reportservice.application.dto.venue.VenueOwnerDailyRevenueResponse();
+        VenueOwnerDailyRevenueResponse day = new VenueOwnerDailyRevenueResponse();
         day.setDate(LocalDate.of(2026, 9, 2));
         day.setRevenue(new BigDecimal("60000.00"));
         day.setSucceededPaymentCount(1L);
         snapshot.getDailyRevenue().add(day);
-        var status = new iuh.fit.reportservice.application.dto.venue.VenueOwnerRevenueStatusResponse();
+        VenueOwnerRevenueStatusResponse status = new VenueOwnerRevenueStatusResponse();
         status.setStatus("SUCCEEDED");
         status.setPaymentCount(3L);
         status.setNominalAmount(new BigDecimal("1250000"));
@@ -133,7 +136,7 @@ class PeriodicReportAdapterTest {
         entity.setSnapshot(JsonMapper.builder().build().writeValueAsString(snapshot));
         when(repository.findById(entity.getReportId())).thenReturn(Optional.of(entity));
 
-        String csv = new String(adapter.export(ownerId, entity.getReportId(), "csv"), java.nio.charset.StandardCharsets.UTF_8);
+        String csv = new String(adapter.export(ownerId, entity.getReportId(), "csv"), StandardCharsets.UTF_8);
 
         // BOM cho Excel, so thuan khong dau ngan cach, nhan trang thai tieng Viet; khong goi Jasper.
         assertThat(csv).startsWith("\uFEFFBáo cáo doanh thu định kỳ,Tháng 09/2026\r\n");
