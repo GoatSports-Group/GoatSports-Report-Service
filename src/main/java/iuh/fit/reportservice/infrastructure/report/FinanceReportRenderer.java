@@ -30,7 +30,7 @@ import java.util.stream.Stream;
 
 /**
  * Báo cáo Tài chính của admin (hoàn tiền / chi trả): lấy mọi dòng khớp bộ lọc từ payment-service một lần, gắn tên
- * người nhận từ DB auth, rồi dựng bằng mẫu Jasper (cùng mẫu cho PDF xem trước và Excel danh sách).
+ * người nhận hỏi từ auth-service, rồi dựng bằng mẫu Jasper (cùng mẫu cho PDF xem trước và Excel danh sách).
  */
 @Component
 @RequiredArgsConstructor

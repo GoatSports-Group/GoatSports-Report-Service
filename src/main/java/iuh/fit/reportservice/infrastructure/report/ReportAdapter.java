@@ -32,7 +32,7 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * Điều phối xuất báo cáo: lấy dữ liệu (auth DB / venue-service) → chuyển thành dòng báo cáo
+ * Điều phối xuất báo cáo: lấy dữ liệu (venue-service) → chuyển thành dòng báo cáo
  * ({@link OwnerBookingReportMapper}, {@link OwnerRevenueReportMapper}) → dựng file ({@link JasperRenderer}).
  */
 @Service

@@ -154,6 +154,14 @@ public class AuditLogAspect {
     }
 
     private String getUserId(ProceedingJoinPoint joinPoint, Object result) {
+        // Người thực hiện là người gọi: gateway gắn X-User-Id sau khi xác thực (và xóa bản client tự gửi). Giá trị trả
+        // về thường là đối tượng bị tác động (thành viên bị đổi vai trò, user admin vừa tạo), chỉ dùng khi chưa đăng nhập.
+        HttpServletRequest current = getRequest();
+        String caller = current != null ? current.getHeader("X-User-Id") : null;
+        if (caller != null && !caller.isBlank()) {
+            return caller;
+        }
+
         if (result != null) {
             String val = getFieldValue(result, "userId");
             if (val != null)
