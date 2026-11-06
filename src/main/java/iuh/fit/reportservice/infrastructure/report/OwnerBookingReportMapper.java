@@ -44,7 +44,7 @@ final class OwnerBookingReportMapper {
                     .sequence(index + 1)
                     .bookingCode(valueOrDash(booking.getBookingCode()))
                     .customerName(customerName(booking))
-                    .customerPhone(valueOrDash(booking.getWalkInCustomerPhone()))
+                    .customerPhone(valueOrDash(firstText(booking.getCustomerPhone(), booking.getWalkInCustomerPhone())))
                     .venueName(valueOrDash(booking.getVenueName()))
                     .courtName(valueOrDash(booking.getCourtName()))
                     .playDate(booking.getPlayDate() == null ? "—" : ReportLabels.DATE.format(booking.getPlayDate()))
@@ -97,7 +97,7 @@ final class OwnerBookingReportMapper {
                 .bookingStatus(ReportLabels.bookingStatus(booking.getStatus()))
                 .createdAt(ReportLabels.timeline(booking.getCreatedAt()))
                 .customerName(customerName(booking))
-                .customerPhone(valueOrDash(booking.getWalkInCustomerPhone()))
+                .customerPhone(valueOrDash(firstText(booking.getCustomerPhone(), booking.getWalkInCustomerPhone())))
                 .customerType(ReportLabels.bookingChannel(booking.getSource()))
                 .venueName(valueOrDash(booking.getVenueName()))
                 .courtName(valueOrDash(booking.getCourtName()))
@@ -245,10 +245,15 @@ final class OwnerBookingReportMapper {
 
     // ---------------------------------------------------------------- hiển thị
 
-    /** Khách vãng lai hiện tên nhập tại quầy; người chơi app chỉ hiện mã rút gọn (report-service không giữ tên). */
+    private static String firstText(String first, String second) {
+        String value = blankToNull(first);
+        return value != null ? value : blankToNull(second);
+    }
+
+    /** Tên venue-service đã ghép; không có (auth-service lỗi, tài khoản đã xóa) thì mới hiện mã rút gọn. */
     private static String customerName(VenueOwnerBookingResponse booking) {
-        String walkInName = blankToNull(booking.getWalkInCustomerName());
-        if (walkInName != null) return walkInName;
+        String name = firstText(booking.getCustomerName(), booking.getWalkInCustomerName());
+        if (name != null) return name;
         if (booking.getPlayerId() == null) return "Khách vãng lai";
         String playerId = booking.getPlayerId().toString().replace("-", "");
         return "Khách #" + playerId.substring(0, Math.min(8, playerId.length())).toUpperCase(Locale.ROOT);

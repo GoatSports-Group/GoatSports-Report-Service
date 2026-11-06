@@ -31,6 +31,8 @@ public class VenueOwnerBookingResponse {
     private String qrCode;
     private String walkInCustomerName;
     private String walkInCustomerPhone;
+    private String customerName;
+    private String customerPhone;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private List<VenueOwnerPaymentResponse> payments = new ArrayList<>();
